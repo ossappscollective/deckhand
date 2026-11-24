@@ -341,7 +341,7 @@ public final class ScrcpySession: @unchecked Sendable {
     // MARK: Input
 
     public func touch(_ action: TouchAction, x: Double, y: Double) {
-        let (control, width, height) = lock.withLock { (control, frameWidth, frameHeight) }
+        let (control, width, height) = lock.withLock { (self.control, self.frameWidth, self.frameHeight) }
         guard let control, width > 0, height > 0 else { return }
         let message = ScrcpyControl.touch(
             ScrcpyControl.TouchAction(rawValue: action.rawValue) ?? .move,
