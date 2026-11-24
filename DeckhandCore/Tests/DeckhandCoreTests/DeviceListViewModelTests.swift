@@ -1,11 +1,21 @@
+import Foundation
 import Testing
 @testable import DeckhandCore
 
+/// A clock the test moves by hand, so that a slow machine cannot expire a boot early.
+private final class TestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var instant = ContinuousClock.now
+    var now: ContinuousClock.Instant { lock.withLock { instant } }
+    func advance(_ duration: Duration) { lock.withLock { instant = instant + duration } }
+}
+
 @MainActor
 private func makeViewModel(sdkRoot: String? = "/sdk",
-                           bootTimeout: Duration = .seconds(60)) -> (DeviceListViewModel, MockShellRunner) {
+                           bootTimeout: Duration = .seconds(60),
+                           clock: TestClock? = nil) -> (DeviceListViewModel, MockShellRunner) {
     let runner = MockShellRunner()
-    let vm = DeviceListViewModel(runner: runner, bootTimeout: bootTimeout) {
+    let vm = DeviceListViewModel(runner: runner, bootTimeout: bootTimeout, now: { clock?.now ?? ContinuousClock.now }) {
         sdkRoot.map(AndroidSDK.init(root:))
     }
     return (vm, runner)
@@ -189,7 +199,8 @@ private func emptyAndroid(_ runner: MockShellRunner) {
 
 @MainActor
 @Test func bootingRevertsToRealStateAfterTimeout() async {
-    let (vm, runner) = makeViewModel(bootTimeout: .milliseconds(20))
+    let clock = TestClock()
+    let (vm, runner) = makeViewModel(bootTimeout: .seconds(60), clock: clock)
     emptySimctl(runner)
     runner.responses["/sdk/emulator/emulator -list-avds"] = .success("Pixel_8\n")
     runner.responses["/sdk/platform-tools/adb devices"] = .success("List of devices attached\n")
@@ -197,7 +208,7 @@ private func emptyAndroid(_ runner: MockShellRunner) {
                         osVersion: "API 34", state: .stopped)
     await vm.perform(.start, on: device)
     #expect(vm.androidDevices.first?.state == .booting)
-    try? await Task.sleep(for: .milliseconds(40))
+    clock.advance(.seconds(61))
     await vm.refresh()
     #expect(vm.androidDevices.first?.state == .stopped)
 }

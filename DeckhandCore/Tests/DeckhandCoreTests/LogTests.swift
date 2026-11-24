@@ -120,7 +120,8 @@ private struct IdleStreamer: ByteStreaming {
     #expect(model.apps == [.init(name: "com.a", count: 2), .init(name: "com.b", count: 1)])
 
     model.filter = LogFilter(apps: ["com.b"])
-    try await Task.sleep(for: .milliseconds(80))
+    // the filter applies after its debounce: wait for it rather than for a fixed time, which a slow machine overruns
+    for _ in 0..<150 where model.visible.map(\.message) != ["b"] { try await Task.sleep(for: .milliseconds(20)) }
     #expect(model.visible.map(\.message) == ["b"])
     model.ingest([entry("d", app: "com.b"), entry("e", app: "com.a")])
     #expect(model.visible.map(\.message) == ["b", "d"])
