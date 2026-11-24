@@ -54,7 +54,7 @@ All notable changes to Deckhand are documented here.
 
 ### Changed
 
-- Renamed from BootBar to Deckhand (a fork of BootBar by Dipendra Sharma, still MIT): the app, the `DeckhandCore` package, the bundle id `com.ossappcollective.Deckhand`, the Android helper `com.deckhand.helper`, the `deckhand://` link scheme and `deckhand.proxy`. Settings and the certificate of the old name are not carried over
+- Renamed from BootBar to Deckhand (a fork of BootBar by Dipendra Sharma, still MIT): the app, the `DeckhandCore` package, the bundle id `com.ossappscollective.Deckhand`, the Android helper `com.deckhand.helper`, the `deckhand://` link scheme and `deckhand.proxy`. Settings and the certificate of the old name are not carried over
 
 - Clicking a device opens its management page
 - Settings are grouped into Android, emulator launch and capture sections

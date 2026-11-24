@@ -10,18 +10,18 @@
 </p>
 
 <p align="center">
-  <a href="https://ossappcollective.github.io/deckhand/">Website</a> ·
+  <a href="https://ossappscollective.github.io/deckhand/">Website</a> ·
   <a href="docs/guide.md">Guide</a> ·
-  <a href="https://github.com/ossappcollective/deckhand/releases/latest">Download</a> ·
+  <a href="https://github.com/ossappscollective/deckhand/releases/latest">Download</a> ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/ossappcollective/deckhand/actions/workflows/ci.yml"><img src="https://github.com/ossappcollective/deckhand/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/ossappscollective/deckhand/actions/workflows/ci.yml"><img src="https://github.com/ossappscollective/deckhand/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Swift-6-orange.svg" alt="Swift 6">
   <img src="https://img.shields.io/badge/platform-macOS%2026%2B-blue.svg" alt="Platform macOS 26+">
   <img src="https://img.shields.io/badge/license-MIT-brightgreen.svg" alt="License MIT">
-  <a href="https://github.com/ossappcollective/deckhand/releases/latest"><img src="https://img.shields.io/github/downloads/ossappcollective/deckhand/total.svg" alt="Downloads"></a>
+  <a href="https://github.com/ossappscollective/deckhand/releases/latest"><img src="https://img.shields.io/github/downloads/ossappscollective/deckhand/total.svg" alt="Downloads"></a>
 </p>
 
 <p align="center">
@@ -48,12 +48,12 @@ No Electron, no daemons, no telemetry. It drives `simctl`, `emulator`, `adb` and
 
 ## Install
 
-Signed and notarized builds are on the [Releases](https://github.com/ossappcollective/deckhand/releases) page.
+Signed and notarized builds are on the [Releases](https://github.com/ossappscollective/deckhand/releases) page.
 
 To build it yourself:
 
 ```bash
-git clone https://github.com/ossappcollective/deckhand.git
+git clone https://github.com/ossappscollective/deckhand.git
 cd deckhand
 DeckhandHelper/build.sh        # optional: bundles the Android helper app (JDK 17 or 21, Android SDK 36)
 xcodebuild -project Deckhand.xcodeproj -scheme Deckhand -derivedDataPath build build

@@ -2,7 +2,7 @@
 (() => {
   if (location.search.includes("shot")) document.body.classList.add("shotmode");
 
-  const repo = "ossappcollective/deckhand";
+  const repo = "ossappscollective/deckhand";
   const buttons = document.querySelectorAll("[data-download]");
   const note = document.querySelector("[data-release-note]");
   const version = document.querySelector("[data-version]");
