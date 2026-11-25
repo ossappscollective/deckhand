@@ -24,10 +24,9 @@
       // no release yet, or the API is rate limited: the buttons keep pointing at the releases page
     });
 
-  const copy = document.querySelector("[data-copy]");
-  if (copy) {
+  document.querySelectorAll("[data-copy]").forEach((copy) => {
     copy.addEventListener("click", async () => {
-      const text = document.getElementById("build").innerText;
+      const text = document.getElementById(copy.dataset.copy).innerText;
       try {
         await navigator.clipboard.writeText(text);
         copy.textContent = "Copied";
@@ -36,5 +35,5 @@
       }
       setTimeout(() => (copy.textContent = "Copy"), 1800);
     });
-  }
+  });
 })();

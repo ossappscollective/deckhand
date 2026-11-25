@@ -264,6 +264,8 @@ kbd { padding: 3px 9px; border-radius: 7px; border: 1px solid var(--line); borde
 pre { margin: 0; padding: 18px 20px; border-radius: 14px; background: #0c0f18; color: #dbe2f5; font-size: 13.5px; line-height: 1.75; overflow-x: auto; border: 1px solid rgba(255,255,255,.08); }
 pre .c { color: #6b7592; } pre .k { color: #8fb4ff; }
 .copy { position: relative; }
+.copy.small pre { padding: 14px 16px; font-size: 12.5px; line-height: 1.7; }
+.mini { margin: 22px 0 8px !important; font-size: 13px !important; color: var(--muted); }
 .copy button { position: absolute; top: 10px; right: 10px; padding: 5px 11px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.07); color: #cdd5ee; font: 12.5px var(--sans); cursor: pointer; }
 .copy button:hover { background: rgba(255,255,255,.14); }
 
@@ -304,3 +306,18 @@ body.shotmode .hero .wrap { width: auto; margin: 0; }
 body.shotmode .hero::before, body.shotmode .hero::after { opacity: .9; }
 body.shotmode .stage { margin: 0; width: 1280px; }
 body.shotmode .cols { height: 640px; }
+
+/* ---------- Compare ---------- */
+.compare { margin-top: 40px; overflow-x: auto; border-radius: 22px; border: 1px solid var(--line); background: var(--card); backdrop-filter: blur(14px); }
+.compare table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 14.5px; }
+.compare th, .compare td { padding: 13px 16px; text-align: center; border-bottom: 1px solid var(--line); }
+.compare thead th { font: 600 13.5px var(--display); color: var(--muted); }
+.compare thead th a { color: inherit; text-decoration: none; }
+.compare thead th a:hover { color: var(--fg); text-decoration: underline; }
+.compare tbody th { text-align: left; font-weight: 500; color: var(--fg); }
+.compare tr:last-child > * { border-bottom: 0; }
+.compare .us { color: var(--fg); }
+.compare tbody td:nth-child(2), .compare thead .us { background: linear-gradient(180deg, rgba(59,130,246,.10), rgba(99,102,241,.08)); }
+.compare td.y { color: var(--green); font-weight: 700; }
+.compare td.n { color: var(--muted); opacity: .5; }
+.fine { max-width: 780px; margin: 22px auto 0; text-align: center; color: var(--muted); font-size: 14px; }
