@@ -85,13 +85,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// Menu bar icon. It lives as long as the app, so it is where link-triggered windows get opened.
 struct MenuBarLabel: View {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+    @AppStorage(Preferences.menuBarIndicatorKey) private var indicator = MenuBarIndicator.iconAndCount
     let center: InstallRequestCenter
+    let list: DeviceListViewModel
+    let router: HubRouter
+    @State private var tray: TrayMenu?
+
+    private var running: Int { indicator == .never ? 0 : list.runningDevices.count }
 
     var body: some View {
-        Image(systemName: "iphone.gen3")
-            .onChange(of: center.openCount) { _, _ in
-                NSApp.activate(ignoringOtherApps: true)
-                openWindow(id: "hub")
+        HStack(spacing: 3) {
+            // the glyph with waves is drawn in the same template colour as the plain one, so it follows the menu bar's tint
+            Image(systemName: running > 0 ? "iphone.gen3.radiowaves.left.and.right" : "iphone.gen3")
+            if indicator == .iconAndCount, running > 0 { Text("\(running)") }
+        }
+        .onChange(of: center.openCount) { _, _ in showWindow() }
+        .task { installTrayMenu() }
+        .task(id: indicator) {
+            // the popover refreshes the list only while it is open; the indicator needs it up to date all the time
+            guard indicator != .never else { return }
+            while !Task.isCancelled {
+                await list.refresh()
+                try? await Task.sleep(for: .seconds(5))
             }
+        }
+    }
+
+    private func showWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: "hub")
+    }
+
+    private func installTrayMenu() {
+        let actions = TrayMenu.Actions(
+            devices: { list.runningDevices },
+            openHub: { deviceId in
+                if let deviceId { router.selection = deviceId }
+                showWindow()
+            },
+            refresh: { Task { await list.refresh() } },
+            openSettings: {
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
+            })
+        if let tray {
+            tray.update(actions)
+        } else {
+            let menu = TrayMenu(actions: actions)
+            menu.install()
+            tray = menu
+        }
     }
 }

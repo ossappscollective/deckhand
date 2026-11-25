@@ -39,7 +39,7 @@ struct DeckhandApp: App {
                 .environment(networkModel)
                 .frame(width: 340, height: 560)
         } label: {
-            MenuBarLabel(center: installCenter)
+            MenuBarLabel(center: installCenter, list: viewModel, router: hubRouter)
         }
         .menuBarExtraStyle(.window)
 

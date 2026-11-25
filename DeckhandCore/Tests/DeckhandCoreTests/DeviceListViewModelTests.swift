@@ -268,3 +268,15 @@ private func emptyAndroid(_ runner: MockShellRunner) {
     await vm.perform(.erase, on: device)
     #expect(vm.iosDevices.first?.state == .stopped)
 }
+
+@MainActor
+@Test func runningAndBootingCountSimulatorsAndEmulatorsOnly() async {
+    let (vm, runner) = makeViewModel()
+    runner.responses["/usr/bin/xcrun simctl list devices --json"] = .success(
+        #"{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-5":[{"udid":"A","name":"iPhone 16","state":"Booted","isAvailable":true},{"udid":"B","name":"iPhone 15","state":"Shutdown","isAvailable":true},{"udid":"C","name":"iPad","state":"Booting","isAvailable":true}]}}"#)
+    runner.responses["/sdk/emulator/emulator -list-avds"] = .success("Pixel_8\n")
+    runner.responses["/sdk/platform-tools/adb devices"] = .success("List of devices attached\n")
+    await vm.refresh()
+    #expect(vm.runningDevices.map(\.name) == ["iPhone 16"])
+    #expect(vm.bootingDevices.map(\.name) == ["iPad"])
+}

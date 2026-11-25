@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage(Preferences.captureDirectoryKey) private var captureDirectory = ""
     @AppStorage(Preferences.terminalAppKey) private var terminalId = "terminal"
     @AppStorage(Preferences.terminalCustomAppKey) private var terminalCustomName = ""
+    @AppStorage(Preferences.menuBarIndicatorKey) private var menuBarIndicator = MenuBarIndicator.iconAndCount
     @AppStorage(Preferences.showPhysicalDevicesKey) private var showPhysicalDevices = true
     @AppStorage(Preferences.syncClipboardKey) private var syncClipboard = true
     @AppStorage(Preferences.logBufferKey) private var logBuffer = 50_000
@@ -28,6 +29,15 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
+            }
+
+            Section("Menu bar") {
+                Picker("Show running simulators and emulators", selection: $menuBarIndicator) {
+                    ForEach(MenuBarIndicator.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                Text("The icon gets radio waves while one is running. Right-click the icon for a menu with the window, Settings, About and Quit.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Physical devices") {

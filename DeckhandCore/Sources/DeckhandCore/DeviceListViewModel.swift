@@ -13,6 +13,10 @@ public final class DeviceListViewModel {
     public private(set) var busyDeviceIds: Set<String> = []
     public private(set) var rowErrors: [String: String] = [:]
 
+    /// Simulators and emulators that are up. Attached phones are always "running", so they do not count.
+    public var runningDevices: [Device] { (iosDevices + androidDevices).filter { $0.state == .running } }
+    public var bootingDevices: [Device] { (iosDevices + androidDevices).filter { $0.state == .booting } }
+
     private let simulatorService: SimulatorService
     private let runner: any ShellRunner
     private let locateSDK: @Sendable () -> AndroidSDK?

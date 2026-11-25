@@ -18,6 +18,7 @@ struct MenuBarPanelView: View {
     @State private var route: PanelRoute = .list
     @Environment(\.openSettings) private var openSettings
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(Preferences.menuBarIndicatorKey) private var indicator = MenuBarIndicator.iconAndCount
 
     private let appLaunched = NSWorkspace.shared.notificationCenter
         .publisher(for: NSWorkspace.didLaunchApplicationNotification)
@@ -202,10 +203,13 @@ struct MenuBarPanelView: View {
         }
     }
 
+    /// With the indicator on, the menu bar icon keeps the list fresh; otherwise the open popover does.
     private func autoRefresh() async {
+        await viewModel.refresh()
+        guard indicator == .never else { return }
         while !Task.isCancelled {
-            await viewModel.refresh()
             try? await Task.sleep(for: .seconds(5))
+            await viewModel.refresh()
         }
     }
 

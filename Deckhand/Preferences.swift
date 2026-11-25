@@ -12,6 +12,7 @@ nonisolated enum Preferences {
     static let networkPortKey = "networkPort"
     static let terminalAppKey = "terminalApp"
     static let terminalCustomAppKey = "terminalCustomApp"
+    static let menuBarIndicatorKey = "menuBarIndicator"
 
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [showPhysicalDevicesKey: true, syncClipboardKey: true, logBufferKey: 50_000])
@@ -40,5 +41,20 @@ nonisolated enum Preferences {
 
     static func locateSDK() -> AndroidSDK? {
         SDKLocator(override: UserDefaults.standard.string(forKey: sdkPathKey)).locate()
+    }
+}
+
+/// What the menu bar icon says about running simulators and emulators.
+enum MenuBarIndicator: String, CaseIterable {
+    case iconAndCount
+    case icon
+    case never
+
+    var title: String {
+        switch self {
+        case .iconAndCount: "Icon and number"
+        case .icon: "Icon only"
+        case .never: "Never"
+        }
     }
 }
