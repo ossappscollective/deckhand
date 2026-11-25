@@ -253,6 +253,14 @@ jobs:
             if ! printf '%s' "$APPLE_API_KEY" | grep -Eq '^[A-Z0-9]{10}$'; then
               echo "::warning::APPLE_API_KEY should be the 10 character key id, not the file name or the key content"
             fi
+            # fingerprints to compare with the values on your Mac (they reveal nothing usable):
+            #   printf %s KEYID | shasum -a 256          printf %s ISSUER | shasum -a 256
+            #   openssl pkey -in AuthKey_KEYID.p8 -pubout | shasum -a 256
+            fp() { shasum -a 256 | cut -c1-12; }
+            echo "Notary API key fingerprints (first 12 hex of sha256):"
+            echo "  key id      $(printf '%s' "$APPLE_API_KEY" | fp)"
+            echo "  issuer      $(printf '%s' "$APPLE_API_ISSUER" | fp)"
+            echo "  public key  $(openssl pkey -in "$key_path" -pubout 2>/dev/null | fp)"
           fi
           security find-identity -v -p codesigning "$keychain"
 
