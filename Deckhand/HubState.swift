@@ -24,7 +24,40 @@ enum AppActivation {
 @MainActor
 final class StatusPopover {
     static let shared = StatusPopover()
-    weak var window: NSWindow?
+
+    weak var window: NSWindow? {
+        didSet {
+            guard window !== oldValue else { return }
+            observer.map(NotificationCenter.default.removeObserver)
+            observer = nil
+            guard let window else { return }
+            // The popover does not make the app the active one, so there may be no "resigned active" when another app
+            // is chosen; it does lose its key status, and that is what closes it. Not while something it opened itself
+            // (a menu, a popover of its own) is key.
+            observer = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak self] _ in
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(80))
+                    guard let self, let window = self.window, window.isVisible else { return }
+                    if let key = NSApp.keyWindow, key === window || (window.childWindows ?? []).contains(key) { return }
+                    self.close()
+                }
+            }
+        }
+    }
+
+    private var observer: NSObjectProtocol?
+    private let workspaceObserver: NSObjectProtocol
+
+    init() {
+        // Another app coming to the front closes it, whatever the popover's own key status was.
+        workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            guard app?.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+            Task { @MainActor in StatusPopover.shared.close() }
+        }
+    }
 
     func close() {
         guard let window, window.isVisible else { return }
