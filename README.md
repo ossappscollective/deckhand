@@ -48,7 +48,12 @@ No Electron, no daemons, no telemetry. It drives `simctl`, `emulator`, `adb` and
 
 ## Install
 
-Signed and notarized builds are on the [Releases](https://github.com/ossappscollective/deckhand/releases) page.
+Signed and notarized builds are on the [Releases](https://github.com/ossappscollective/deckhand/releases) page, or with Homebrew:
+
+```bash
+brew tap ossappscollective/deckhand https://github.com/ossappscollective/deckhand
+brew install --cask deckhand
+```
 
 To build it yourself:
 
@@ -67,7 +72,7 @@ Without the helper app, Android devices use the global proxy setting instead of 
 - macOS 26 or later
 - Xcode, for `xcrun simctl` (the iOS side)
 - The Android SDK with `emulator` and `platform-tools` (the Android side)
-- Optional: `brew install scrcpy` for a faster Android mirror, `brew install baguette` for touch and rotation on simulators
+- Optional: `brew install scrcpy` for a faster Android mirror, `brew install baguette` for touch and rotation on simulators. When Deckhand needs one that is missing, it says so and shows the project page and the install command.
 
 Each side works without the other: with no Xcode the iOS section shows a hint and Android keeps working, and the other way round.
 

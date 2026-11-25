@@ -6,6 +6,8 @@ All notable changes to Deckhand are documented here.
 
 ### Added
 
+- Homebrew: `brew tap ossappscollective/deckhand https://github.com/ossappscollective/deckhand`, then `brew install --cask deckhand`. The release workflow rewrites `Casks/deckhand.rb` for every release
+- When an action needs scrcpy, Baguette or bundletool and it is not installed, Deckhand explains what it is for and opens a popover with a link to the project and the `brew install` command (in the mirror bar, the **…** menu, the camera section, the log panel and the notices)
 - Network panel: capture and inspect the HTTP and HTTPS requests of iOS simulators and Android devices, with search (URL, headers, bodies, regex), method/status/app filters, headers, query parameters, request and response bodies, pretty JSON and image previews, timing, copy (URL, cURL, headers, bodies) and save response
 - Built-in intercepting proxy in Swift with an on-the-fly certificate authority, and Set Up actions that trust the certificate and route the device (simulator keychain and macOS proxy, `adb reverse` and the Android proxy setting)
 - Start Headless for emulators (`-no-window`) and simulators (the Simulator app stays closed), and Start and Start Headless buttons in the mirror of a stopped device

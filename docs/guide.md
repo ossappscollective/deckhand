@@ -2,6 +2,15 @@
 
 Everything Deckhand does, in detail. The [README](../README.md) has the short version.
 
+## Install with Homebrew
+
+```bash
+brew tap ossappscollective/deckhand https://github.com/ossappscollective/deckhand
+brew install --cask deckhand
+```
+
+The cask is `Casks/deckhand.rb` in this repository, and the release workflow rewrites it with the new version and checksum after each release. Upgrade with `brew upgrade --cask deckhand`.
+
 ## Requirements
 
 - macOS 26 or later
@@ -158,6 +167,10 @@ All device logic lives in `DeckhandCore`, a local Swift package with full unit t
 cd DeckhandCore
 swift test
 ```
+
+## Missing optional tools
+
+scrcpy, Baguette and bundletool are open source programs that Deckhand uses when they are installed. When you ask for something that needs one that is missing, a **How to install** (or **Install …**) button opens a popover with what the tool gives you, a link to its project and the `brew install` command to copy. Android still mirrors without scrcpy, through adb, and a simulator is view-only without Baguette.
 
 ## FAQ
 
