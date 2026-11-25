@@ -24,6 +24,8 @@ struct HubView: View {
     @State private var creating: Platform?
     @State private var mirror = MirrorController()
     @State private var deleting: Device?
+    @State private var columnVisibility = NavigationSplitViewVisibility.automatic
+    @State private var windowFit = WindowFit()
 
     var body: some View {
         @Bindable var router = router
@@ -32,7 +34,7 @@ struct HubView: View {
     }
 
     private func content(router selection: Binding<String?>) -> some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar(selection: selection)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
         } detail: {
@@ -87,6 +89,18 @@ struct HubView: View {
         .focusedSceneValue(\.hubActions, HubActions(device: selected, isRecording: selected.map { tools.isRecording($0) } ?? false,
                                                    perform: { perform($0) }))
         .onChange(of: router.selection) { _, _ in creating = nil }
+        .background(WindowAccessor { windowFit.attach($0) })
+        // a panel shown or hidden: the window takes the width, so the picture keeps its size
+        .onChange(of: panelLayout) { _, _ in
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(450))   // the sidebar and the columns settle first
+                fitWindowToPicture()
+            }
+        }
+        .onChange(of: aspectLock, initial: true) { _, lock in
+            windowFit.lockedAspect = lock
+            windowFit.barHeight = selected.map { $0.platform == .android || !$0.isPhysical } == true ? Self.barHeight : 0
+        }
         .onAppear {
             tools.didRotate = { mirror.rotated($0, clockwise: $1) }
             tools.onScreenshotCaptured = { ScreenshotThumbnail.shared.show(path: $0) }
@@ -224,6 +238,7 @@ struct HubView: View {
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .leading)
             }
             // narrower than this, the picture or the tools column would be pushed out of the window
+            .onGeometryChange(for: CGSize.self, of: { $0.size }) { windowFit.detailSize = $0 }
             .frame(minWidth: (showMirror ? Self.mirrorMin : 0) + (showInspector || !showMirror ? inspectorMin : 0))
             .task(id: LogKey(deviceId: device.id, running: device.state == .running,
                              visible: logMode != .hidden && panelKind == .logs && (showInspector || !showMirror))) {
@@ -279,6 +294,42 @@ struct HubView: View {
                     if tools.message == message { tools.dismissMessage() }
                 }
         }
+    }
+
+    /// What decides how wide the window should be: which panels are showing.
+    private struct PanelLayout: Equatable {
+        let mirror: Bool
+        let inspector: Bool
+        let sidebar: Bool
+        let logs: Bool
+    }
+
+    private var panelLayout: PanelLayout {
+        PanelLayout(mirror: showMirror, inspector: showInspector, sidebar: columnVisibility != .detailOnly, logs: logMode != .hidden)
+    }
+
+    /// The picture's width over its height while dragging the window's edges should keep it: only the mirror is in the
+    /// window, and the picture is a portrait one.
+    private var aspectLock: CGFloat? {
+        guard showMirror, !showInspector, columnVisibility == .detailOnly, creating == nil,
+              let device = selected, device.state == .running, mirror.state == .live,
+              let size = mirror.displaySize, size.height > size.width else { return nil }
+        return size.width / size.height
+    }
+
+    /// Gives the window the width at which the picture, with the height it has now, has no bars beside it.
+    private func fitWindowToPicture() {
+        guard showMirror, creating == nil, let device = selected, device.state == .running, mirror.state == .live,
+              let size = mirror.displaySize, size.width > 0, size.height > 0 else { return }
+        let detail = windowFit.detailSize
+        let bar = device.platform == .android || !device.isPhysical ? Self.barHeight : 0
+        let pictureHeight = detail.height - bar
+        guard pictureHeight > 0 else { return }
+        // the tools column is a share of the width (but never narrower than its content), see splitWidths
+        let target = WindowSizing.detailWidth(pictureHeight: pictureHeight, aspect: size.width / size.height,
+                                              showsInspector: showInspector, inspectorFraction: CGFloat(inspectorFraction),
+                                              inspectorMinimum: inspectorMin)
+        windowFit.resizeWidth(by: target - detail.width)
     }
 
     private var logMode: PanelMode { PanelMode(rawValue: logModeRaw) ?? .hidden }
