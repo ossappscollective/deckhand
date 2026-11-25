@@ -59,7 +59,7 @@ The window icon in the panel header (or **Open in the Deckhand window** on a dev
 
 `brew install scrcpy` switches the window to scrcpy's server automatically (Deckhand talks to it directly, no scrcpy window opens). **Tools → scrcpy** still opens scrcpy's own window. While the window is open Deckhand also shows in the Dock.
 
-**Start headless.** A stopped device shows Start and Start Headless in the mirror, and the device menus have Start Headless. An emulator then runs with `-no-window`; a simulator is booted without opening the Simulator app. The mirror is the only screen. Capturing in the Network panel stops by itself when its device stops.
+**Start headless.** In the Deckhand window, **Start** boots the device without a window of its own, because the mirror is the screen: an emulator runs with `-no-window`, and a simulator is booted without opening the Simulator app. **Start with Window** (in the mirror, the sidebar menu and the Device menu) opens the Simulator app or the emulator's own window as well. In the popover, a device's **…** menu has **Start in Deckhand** (headless, and the Deckhand window opens on it), **Start in Background** (headless, nothing opens) and **Start with Simulator/Emulator Window**. Capturing in the Network panel stops by itself when its device stops.
 
 **Device and Panels menus.** They work on the selected device whether it is a simulator or an emulator, and use the Simulator's shortcuts where it has one:
 
@@ -173,6 +173,10 @@ swift test
 Click it for the device popover. Right-click (or control-click) it for a menu: **Open Deckhand**, the running simulators and emulators (choose one to open the window on it), **Refresh Devices**, **Settings…**, **About Deckhand** and **Quit Deckhand**.
 
 The icon shows when something is running: the phone gets radio waves, and the number of running simulators and emulators appears beside it. It follows the menu bar's own tint, so it looks right on any wallpaper. **Settings → General → Menu bar** switches the number off or turns the indicator off. With the indicator on, Deckhand checks the device list every 5 seconds in the background even when the popover is closed; with it off, only while the popover is open.
+
+### The popover
+
+It follows the system's own menus: a round badge per device, filled green while it is running, controls under the pointer, and Settings and Quit as menu rows. **Click** a device to open it, **double-click** to open it the other way. By default a click opens it in the Deckhand window (a stopped device is started headless first) and a double-click in the Simulator app or the emulator's own window (a stopped device is started with it). **Settings → General → Menu bar → Clicking a device in the popover opens** swaps the two. Everything else a device can do is in its **…** menu, including **Manage…**.
 
 ## Missing optional tools
 

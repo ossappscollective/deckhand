@@ -6,6 +6,10 @@ All notable changes to Deckhand are documented here.
 
 ### Added
 
+- In the Deckhand window, Start boots a device headless (the mirror is its screen) and Start with Window opens the Simulator app or the emulator window as well
+- Popover: **Start in Deckhand** (headless, opens the window on the device), **Start in Background** and **Start with Simulator/Emulator Window** in a device's **…** menu; the right-click menu has a **Start in Deckhand** list of the stopped devices
+- Popover: click a device to open it, double-click to open it the other way (the Deckhand window, or the Simulator app or emulator window); Settings picks which one the click does
+- The popover looks like the system's own menus: round device badges, controls on hover, menu rows for Settings and Quit
 - Right-click (or control-click) the menu bar icon for a menu: open the Deckhand window, the running simulators and emulators (each opens the window on it), refresh, Settings, About and Quit
 - The menu bar icon shows when a simulator or emulator is running: the phone gets radio waves and, if you like, the number of running devices. Settings → General → Menu bar turns it to icon only or off
 - Homebrew: `brew tap ossappscollective/deckhand https://github.com/ossappscollective/deckhand`, then `brew install --cask deckhand`. The release workflow rewrites `Casks/deckhand.rb` for every release
