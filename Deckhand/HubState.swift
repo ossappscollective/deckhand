@@ -19,6 +19,19 @@ enum AppActivation {
     }
 }
 
+/// The popover of the menu bar icon. SwiftUI closes it when you click outside it, but not when you switch app with
+/// Command-Tab, or when something it started opens a window of its own.
+@MainActor
+final class StatusPopover {
+    static let shared = StatusPopover()
+    weak var window: NSWindow?
+
+    func close() {
+        guard let window, window.isVisible else { return }
+        window.orderOut(nil)
+    }
+}
+
 /// Which device the Deckhand window shows; set by the popover when it hands over.
 @MainActor
 @Observable
@@ -56,6 +69,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Set when the window first opens; capturing only starts from there.
     @MainActor static var network: NetworkViewModel?
     private var signalSources: [DispatchSourceSignal] = []
+
+    func applicationDidResignActive(_ notification: Notification) {
+        Task { @MainActor in StatusPopover.shared.close() }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // helpers a killed or crashed earlier run left behind (log streams, mirrors) would keep running for ever

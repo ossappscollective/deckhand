@@ -6,6 +6,7 @@ All notable changes to Deckhand are documented here.
 
 ### Added
 
+- The menu bar popover closes by itself when it opens the Deckhand window, a device or Settings, when it starts a device, and when you switch to another app (Command-Tab)
 - Showing or hiding the sidebar, the mirror, the tools column or the log panel gives the window the width at which the picture keeps its size, so no black bars appear beside it (the height and the top-left corner stay)
 - The window grows and shrinks together with the panels (the sidebar, the mirror, the tools column, the logs and network panels slide in and out) instead of after them
 - With only a portrait picture in the window, dragging a corner keeps the picture's shape, smoothly; dragging an edge resizes freely, and so do landscape pictures and windows with panels

@@ -27,6 +27,7 @@ struct MenuBarPanelView: View {
 
     var body: some View {
         content
+        .background(WindowAccessor { StatusPopover.shared.window = $0 })
         .task { await autoRefresh() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await viewModel.refresh() } }
@@ -150,6 +151,7 @@ struct MenuBarPanelView: View {
     private var footer: some View {
         VStack(spacing: 0) {
             MenuRow(title: "Settings…", symbol: "gearshape", shortcut: "⌘,") {
+                StatusPopover.shared.close()
                 NSApp.activate(ignoringOtherApps: true)
                 openSettings()
             }
@@ -163,6 +165,7 @@ struct MenuBarPanelView: View {
     /// What a click (and, the other way round, a double-click) on a device does. A device that is not up is started first:
     /// without a window of its own when it is to open in Deckhand, with it when it is to open in its own.
     private func openDevice(_ device: Device, _ mode: DeviceOpenMode) {
+        StatusPopover.shared.close()
         switch (mode, device.state) {
         case (.deckhand, .stopped) where !device.isPhysical:
             Task { await viewModel.perform(.startHeadless, on: device) }
@@ -177,6 +180,10 @@ struct MenuBarPanelView: View {
     }
 
     private func performAction(_ action: DeviceAction, on device: Device) {
+        switch action {
+        case .start, .startHeadless, .startWithAlternateAudio, .coldBoot: StatusPopover.shared.close()
+        default: break
+        }
         Task { await viewModel.perform(action, on: device) }
     }
 
@@ -185,6 +192,7 @@ struct MenuBarPanelView: View {
     }
 
     private func openHub(selecting deviceId: String?) {
+        StatusPopover.shared.close()
         if let deviceId { hubRouter.selection = deviceId }
         AppActivation.bringToFront()
         openWindow(id: "hub")
