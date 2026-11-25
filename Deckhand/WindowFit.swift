@@ -98,12 +98,48 @@ final class WindowFit {
             try? await Task.sleep(for: .seconds(duration + 0.7))
             self?.refreshSidebarWidth()
         }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = duration
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            window.animator().setFrame(frame, display: true)
-        }
+        animate(window, to: frame, duration: duration)
         return true
+    }
+
+    // MARK: Animation
+
+    // AppKit's own animated resize (`animator().setFrame`) lets the window server stretch the window's old picture until the
+    // content has caught up, which shows as the contents growing from the middle. Here every step is a real resize: the
+    // content is laid out and drawn at each step, one per display refresh.
+
+    private var link: CADisplayLink?
+    private var run: (start: CFTimeInterval, duration: TimeInterval, from: NSRect, to: NSRect)?
+
+    private func animate(_ window: NSWindow, to frame: NSRect, duration: TimeInterval) {
+        link?.invalidate()
+        guard let view = window.contentView else {
+            window.setFrame(frame, display: true)
+            return
+        }
+        run = (CACurrentMediaTime(), duration, window.frame, frame)
+        let link = view.displayLink(target: self, selector: #selector(step(_:)))
+        link.add(to: .main, forMode: .common)
+        self.link = link
+    }
+
+    @objc private func step(_ link: CADisplayLink) {
+        guard let window, let run else {
+            link.invalidate()
+            return
+        }
+        let progress = min((CACurrentMediaTime() - run.start) / run.duration, 1)
+        // ease in and out
+        let eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - pow(-2 * progress + 2, 3) / 2
+        var frame = run.to
+        frame.origin.x = run.from.origin.x + (run.to.origin.x - run.from.origin.x) * eased
+        frame.size.width = run.from.width + (run.to.width - run.from.width) * eased
+        window.setFrame(frame, display: true)
+        if progress >= 1 {
+            link.invalidate()
+            self.link = nil
+            self.run = nil
+        }
     }
 
     /// The size the window should take instead of `proposed`: a corner drag keeps the picture's shape, an edge drag is free.
