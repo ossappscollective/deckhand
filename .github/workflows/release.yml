@@ -232,13 +232,27 @@ jobs:
           # the notary API key, as the .p8 file notarytool wants
           if [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_ISSUER" ] && [ -n "$APPLE_API_KEY_CONTENT" ]; then
             key_path="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY.p8"
-            if printf '%s' "$APPLE_API_KEY_CONTENT" | grep -q 'BEGIN PRIVATE KEY'; then
-              printf '%s\n' "$APPLE_API_KEY_CONTENT" > "$key_path"
-            else
-              printf '%s' "$APPLE_API_KEY_CONTENT" | base64 --decode > "$key_path"
+            content=$(printf '%s' "$APPLE_API_KEY_CONTENT" | tr -d '\r')
+            if ! printf '%s' "$content" | grep -q 'BEGIN PRIVATE KEY'; then
+              content=$(printf '%s' "$content" | base64 --decode)
             fi
+            # a secret pasted as one line has "\n" where the line breaks go
+            case "$content" in *'\n'*) content=$(printf '%b' "$content") ;; esac
+            printf '%s\n' "$content" > "$key_path"
             chmod 600 "$key_path"
             echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+
+            # what a 401 from the notary service usually comes down to, checked without printing the secrets
+            if ! openssl pkey -in "$key_path" -noout 2>/dev/null; then
+              echo "::error::APPLE_API_KEY_CONTENT is not a readable private key: paste the whole AuthKey_XXXX.p8 file, BEGIN and END lines included"
+              exit 1
+            fi
+            if ! printf '%s' "$APPLE_API_ISSUER" | grep -Eq '^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$'; then
+              echo "::warning::APPLE_API_ISSUER is not a UUID (an individual API key has no issuer id: use the Apple ID secrets instead)"
+            fi
+            if ! printf '%s' "$APPLE_API_KEY" | grep -Eq '^[A-Z0-9]{10}$'; then
+              echo "::warning::APPLE_API_KEY should be the 10 character key id, not the file name or the key content"
+            fi
           fi
           security find-identity -v -p codesigning "$keychain"
 
