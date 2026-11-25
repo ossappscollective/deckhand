@@ -1,8 +1,10 @@
 import AppKit
 
-/// The thumbnail macOS shows in the bottom-right corner after a screenshot: it slides in, goes away by itself, and can be
-/// dragged into any app or folder as the file it is. Click it to open the file; right-click for Show in Finder, Copy and
-/// Delete. Apple's own screenshot tool has no way to be started with a picture, so this stands in for it.
+/// The thumbnail macOS shows in the bottom-right corner after a screenshot: it slides in, goes away by itself (or when
+/// swiped to the right), and can be dragged into any app or folder as the file it is. Click it to open the file;
+/// right-click for Save, Show in Finder, Copy and Delete. The file lives in a temporary folder, and is saved to the
+/// capture folder only on request. Apple's own screenshot tool has no way to be started with a picture, so this stands in
+/// for it.
 @MainActor
 final class ScreenshotThumbnail {
     static let shared = ScreenshotThumbnail()
@@ -88,6 +90,7 @@ private final class ThumbnailView: NSView, NSDraggingSource {
     private let closeButton = NSButton()
     private var pressed: NSPoint?
     private var dragging = false
+    private var swiped: CGFloat = 0
 
     init(frame: NSRect, image: NSImage, path: String) {
         self.image = image
@@ -164,9 +167,21 @@ private final class ThumbnailView: NSView, NSDraggingSource {
         onClose?()
     }
 
+    /// A two-finger swipe to the right sends it away, as the system's thumbnail does.
+    override func scrollWheel(with event: NSEvent) {
+        guard event.phase != [] || event.momentumPhase != [] else { return }
+        if event.phase.contains(.began) { swiped = 0 }
+        swiped += event.scrollingDeltaX
+        if swiped > 60 {
+            swiped = 0
+            onClose?()
+        }
+    }
+
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
         menu.addItem(item("Open", #selector(open)))
+        menu.addItem(item("Save to \((Preferences.captureDirectory as NSString).lastPathComponent)", #selector(save)))
         menu.addItem(item("Show in Finder", #selector(reveal)))
         menu.addItem(item("Copy", #selector(copyImage)))
         menu.addItem(.separator())
@@ -182,6 +197,13 @@ private final class ThumbnailView: NSView, NSDraggingSource {
     }
 
     @objc private func open() { NSWorkspace.shared.open(URL(fileURLWithPath: path)); onClose?() }
+    /// Copies the file to the capture folder, where the plain screenshots go.
+    @objc private func save() {
+        let target = URL(fileURLWithPath: Preferences.captureDirectory).appendingPathComponent((path as NSString).lastPathComponent)
+        try? FileManager.default.copyItem(atPath: path, toPath: target.path)
+        NSWorkspace.shared.activateFileViewerSelecting([target])
+        onClose?()
+    }
     @objc private func reveal() { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]); onClose?() }
     @objc private func copyImage() {
         NSPasteboard.general.clearContents()

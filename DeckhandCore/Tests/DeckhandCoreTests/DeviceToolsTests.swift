@@ -452,10 +452,27 @@ private func bundleTools(_ runner: MockShellRunner, bundletool: String? = "/bt/b
     await tools.screenshotToCorner(sim)
     #expect(captured.count == 1)
     #expect(captured.first?.hasSuffix(".png") == true)
+    // a thumbnail's file goes to the temporary folder, not to the capture folder
+    #expect(captured.first?.contains("Deckhand Screenshots") == true)
     #expect(!runner.commands.contains { $0.hasPrefix("/usr/bin/open -R") })
 
     // the next plain screenshot is revealed as before
     await tools.perform(.screenshot, on: sim)
     #expect(captured.count == 1)
     #expect(runner.commands.contains { $0.hasPrefix("/usr/bin/open -R") })
+}
+
+@Test func theScreenshotCacheRemovesOnlyOldFiles() throws {
+    let base = FileManager.default.temporaryDirectory.appendingPathComponent("cache-test-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: base) }
+    let folder = URL(fileURLWithPath: ScreenshotCache.directory(in: base))
+    let old = folder.appendingPathComponent("old.png")
+    let fresh = folder.appendingPathComponent("fresh.png")
+    try Data("x".utf8).write(to: old)
+    try Data("x".utf8).write(to: fresh)
+    try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-ScreenshotCache.keepsFor - 60)],
+                                          ofItemAtPath: old.path)
+    _ = ScreenshotCache.directory(in: base)
+    #expect(!FileManager.default.fileExists(atPath: old.path))
+    #expect(FileManager.default.fileExists(atPath: fresh.path))
 }

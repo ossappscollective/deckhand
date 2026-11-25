@@ -74,7 +74,7 @@ The window icon in the panel header (or **Open in the Deckhand window** on a dev
 | ⇧⌘A | Toggle dark mode |
 | ⌥⌘= / ⌥⌘- | Larger / smaller text |
 | ⌘S | Screenshot (saved, and shown in the Finder) |
-| ⌃S | Screenshot with Thumbnail: saved, and a thumbnail slides in at the bottom right of the screen like macOS's own screenshot tool. Drag it into any app or folder, click it to open the file, right-click for Show in Finder, Copy and Move to Trash. It goes away by itself after a few seconds |
+| ⌃S | Screenshot with Thumbnail: a thumbnail slides in at the bottom right of the screen like macOS's own screenshot tool. The picture is not saved to the capture folder; its file is in a temporary folder (kept 3 days). Drag it into any app or folder, click it to open the file, swipe it to the right or wait a few seconds to send it away, right-click for Save (to the capture folder), Show in Finder, Copy and Move to Trash |
 | ⌥⌘R | Start / stop recording |
 | ⌥⌘1 … 4 | Show the mirror, logs, network, tools |
 

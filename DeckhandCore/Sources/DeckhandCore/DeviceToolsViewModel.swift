@@ -168,7 +168,7 @@ public final class DeviceToolsViewModel {
         var tools = SimulatorTools(runner: runner)
         tools.terminal = terminalApp()
         switch tool {
-        case .screenshot: return try await finishCapture(try await tools.screenshot(device, directory: captureDirectory()))
+        case .screenshot: return try await finishCapture(try await tools.screenshot(device, directory: screenshotDirectory()))
         case .startRecording: return try await beginRecording(device, path: try await tools.startRecording(device, directory: captureDirectory()))
         case .stopRecording: return try await endRecording(device) { try await tools.stopRecording(device) }
         case .appearance(let dark): try await tools.setAppearance(device, dark: dark); return dark ? "Dark mode on" : "Light mode on"
@@ -205,7 +205,7 @@ public final class DeviceToolsViewModel {
     private func runPhysicalIOS(_ tool: DeviceTool, on device: Device) async throws -> String? {
         let tools = PhysicalIOSTools(runner: runner)
         switch tool {
-        case .screenshot: return try await finishCapture(try await tools.screenshot(device, directory: captureDirectory()))
+        case .screenshot: return try await finishCapture(try await tools.screenshot(device, directory: screenshotDirectory()))
         case .startRecording: return try await beginRecording(device, path: try await tools.startRecording(device, directory: captureDirectory()))
         case .stopRecording: return try await endRecording(device) { try await tools.stopRecording(device) }
         case .install(let source): try await tools.install(device, source: source); return "Installed app"
@@ -218,7 +218,7 @@ public final class DeviceToolsViewModel {
     private func runAndroid(_ tool: DeviceTool, on device: Device) async throws -> String? {
         let tools = try emulatorTools()
         switch tool {
-        case .screenshot: return try await finishCapture(try await tools.screenshot(device, directory: captureDirectory()))
+        case .screenshot: return try await finishCapture(try await tools.screenshot(device, directory: screenshotDirectory()))
         case .startRecording: return try await beginRecording(device, path: try await tools.startRecording(device, directory: captureDirectory()))
         case .stopRecording: return try await endRecording(device) { try await tools.stopRecording(device) }
         case .appearance(let dark): try await tools.setAppearance(device, dark: dark); return dark ? "Dark mode on" : "Light mode on"
@@ -255,12 +255,19 @@ public final class DeviceToolsViewModel {
         screenshotToCorner = false
     }
 
+    /// Where a screenshot goes: the capture folder, or for a thumbnail a temporary one that only lives as long as it is
+    /// needed (the file is for dragging into another app, not for the Desktop).
+    private func screenshotDirectory() -> String {
+        guard screenshotToCorner, onScreenshotCaptured != nil else { return captureDirectory() }
+        return ScreenshotCache.directory()
+    }
+
     private func finishCapture(_ path: String) async throws -> String {
         if screenshotToCorner, let onScreenshotCaptured {
             onScreenshotCaptured(path)
-        } else {
-            try await reveal(path)
+            return "Screenshot taken"
         }
+        try await reveal(path)
         return "Saved \((path as NSString).lastPathComponent)"
     }
 
