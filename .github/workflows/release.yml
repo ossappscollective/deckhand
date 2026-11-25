@@ -278,6 +278,7 @@ jobs:
               "DEVELOPMENT_TEAM=$APPLE_TEAM_ID"
               PROVISIONING_PROFILE_SPECIFIER=
               ENABLE_HARDENED_RUNTIME=YES
+              CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO
               "OTHER_CODE_SIGN_FLAGS=--timestamp --keychain $KEYCHAIN_PATH"
             )
           else
@@ -291,6 +292,11 @@ jobs:
           test -d "$app"
           echo "APP_PATH=$app" >> "$GITHUB_ENV"
           codesign --verify --deep --strict --verbose=2 "$app" || [ "$SIGNING" != true ]
+          if [ "$SIGNING" = true ] && codesign -d --entitlements - "$app" 2>&1 | grep -q 'get-task-allow'; then
+            # Xcode adds it for debugging and the notary service rejects it
+            echo "::error::The app is signed with com.apple.security.get-task-allow"
+            exit 1
+          fi
 
       - name: Notarize and staple app
         if: steps.signing.outputs.enabled == 'true'
