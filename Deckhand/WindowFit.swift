@@ -68,22 +68,24 @@ final class WindowFit {
     }
 
     /// Gives the window `width`, animated alongside the panels, with the top-left corner where it is, and keeps it on the screen.
-    func setWidth(_ width: CGFloat, duration: TimeInterval) {
+    @discardableResult
+    func setWidth(_ width: CGFloat, duration: TimeInterval) -> Bool {
         guard let window, !window.styleMask.contains(.fullScreen), !window.isZoomed,
-              let visible = (window.screen ?? NSScreen.main)?.visibleFrame else { return }
+              let visible = (window.screen ?? NSScreen.main)?.visibleFrame else { return false }
         var frame = window.frame
         frame.size.width = max(min(width, visible.width), Self.narrowest)
         // the window's minimum is still the one of the layout that is going away (the sidebar and the picture, say); the
         // layout that comes has a lower one and puts it back when it is in place
         if frame.width < window.minSize.width { window.minSize.width = frame.width }
         if frame.maxX > visible.maxX { frame.origin.x = max(visible.minX, visible.maxX - frame.width) }
-        guard abs(frame.width - window.frame.width) > 1 else { return }
+        guard abs(frame.width - window.frame.width) > 1 else { return false }
         animatingUntil = Date().addingTimeInterval(duration + 0.3)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = duration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             window.animator().setFrame(frame, display: true)
         }
+        return true
     }
 
     /// The size the window should take instead of `proposed`: a corner drag keeps the picture's shape, an edge drag is free.

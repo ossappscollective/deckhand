@@ -26,6 +26,10 @@ struct HubView: View {
     @State private var deleting: Device?
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var windowFit = WindowFit()
+    /// While the window changes width with a panel, the mirror and the tools column keep the widths they will end with:
+    /// the window's own animation uncovers or covers them, so the picture does not move or change size on the way.
+    @State private var pinnedSplit: PinnedSplit?
+    @State private var pinGeneration = 0
 
     var body: some View {
         @Bindable var router = router
@@ -50,7 +54,7 @@ struct HubView: View {
                 }
             }
             ToolbarItem {
-                Toggle(isOn: $showMirror) {
+                Toggle(isOn: Binding(get: { showMirror }, set: { value in changePanels { showMirror = value } })) {
                     Label("Mirror", systemImage: "rectangle.on.rectangle")
                 }
                 .toggleStyle(.button)
@@ -73,7 +77,7 @@ struct HubView: View {
                 .help("Show the HTTP and HTTPS requests of the selected device")
             }
             ToolbarItem {
-                Toggle(isOn: $showInspector) {
+                Toggle(isOn: Binding(get: { showInspector }, set: { value in changePanels { showInspector = value } })) {
                     Label("Tools", systemImage: "sidebar.right")
                 }
                 .toggleStyle(.button)
@@ -91,7 +95,7 @@ struct HubView: View {
         .onChange(of: router.selection) { _, _ in creating = nil }
         .background(WindowAccessor { windowFit.attach($0) })
         // a panel shown or hidden: the window takes the width at the same time, so the picture keeps its size
-        .onChange(of: panelLayout) { _, _ in fitWindowToPicture() }
+        .onChange(of: columnVisibility) { _, _ in fitWindowToPicture() }
         .animation(Self.panelAnimation, value: animatedLayout)
         .onChange(of: aspectLock, initial: true) { _, lock in
             windowFit.keepsShape = lock
@@ -199,6 +203,8 @@ struct HubView: View {
                     if showMirror {
                         MirrorPane(device: device, controller: mirror)
                             .frame(width: split.mirror)
+                            // the window's own animation moves things; a second one on the width would lag behind it
+                            .animation(nil, value: split.mirror)
                         if showInspector { splitHandle(total: geometry.size.width, inspector: split.inspector).transition(.opacity) }
                     }
                     if showInspector || !showMirror {
@@ -215,12 +221,12 @@ struct HubView: View {
                                 Group {
                                     if panelKind == .network {
                                         NetworkPanelView(device: device, model: network, kind: kindBinding, isFull: logMode == .full,
-                                                         onToggleFull: { logModeRaw = (logMode == .full ? PanelMode.split : .full).rawValue },
-                                                         onClose: { logModeRaw = PanelMode.hidden.rawValue })
+                                                         onToggleFull: { setLogMode(logMode == .full ? .split : .full) },
+                                                         onClose: { setLogMode(.hidden) })
                                     } else {
                                         LogPanelView(device: device, model: logs, kind: kindBinding, isFull: logMode == .full,
-                                                     onToggleFull: { logModeRaw = (logMode == .full ? PanelMode.split : .full).rawValue },
-                                                     onClose: { logModeRaw = PanelMode.hidden.rawValue })
+                                                     onToggleFull: { setLogMode(logMode == .full ? .split : .full) },
+                                                     onClose: { setLogMode(.hidden) })
                                     }
                                 }
                                     .frame(height: logMode == .split ? min(logHeight, max(geometry.size.height - 160, 120)) : nil)
@@ -229,11 +235,13 @@ struct HubView: View {
                             }
                         }
                         .frame(width: split.inspector)
+                        .animation(nil, value: split.inspector)
                         .background(.background.secondary)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                        .transition(.opacity)
                     }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .leading)
+                .clipped()
             }
             // narrower than this, the picture or the tools column would be pushed out of the window
             .onGeometryChange(for: CGSize.self, of: { $0.size }) { windowFit.measured(detail: $0, sidebarVisible: columnVisibility != .detailOnly) }
@@ -294,18 +302,6 @@ struct HubView: View {
         }
     }
 
-    /// What decides how wide the window should be: which panels are showing.
-    private struct PanelLayout: Equatable {
-        let mirror: Bool
-        let inspector: Bool
-        let sidebar: Bool
-        let logs: Bool
-    }
-
-    private var panelLayout: PanelLayout {
-        PanelLayout(mirror: showMirror, inspector: showInspector, sidebar: columnVisibility != .detailOnly, logs: logMode != .hidden)
-    }
-
     /// What the panels' own animation follows (the sidebar has the system's).
     private struct AnimatedLayout: Equatable {
         let mirror: Bool
@@ -317,7 +313,8 @@ struct HubView: View {
         AnimatedLayout(mirror: showMirror, inspector: showInspector, logs: logModeRaw)
     }
 
-    static let panelAnimation = Animation.easeInOut(duration: 0.28)
+    static let panelDuration = 0.28
+    static let panelAnimation = Animation.easeInOut(duration: panelDuration)
 
     /// Whether a drag of a corner of the window keeps the picture's shape: only a portrait picture is in the window.
     private var aspectLock: Bool {
@@ -325,6 +322,18 @@ struct HubView: View {
               let device = selected, device.state == .running, mirror.state == .live,
               let size = mirror.displaySize else { return false }
         return size.height > size.width
+    }
+
+    /// Changes what the window shows and gives the window the width that goes with it in the same turn, so the two
+    /// animate together.
+    private func changePanels(_ change: () -> Void) {
+        change()
+        fitWindowToPicture()
+    }
+
+    private struct PinnedSplit: Equatable {
+        let mirror: CGFloat
+        let inspector: CGFloat
     }
 
     /// Gives the window the width at which the picture, with the height it has now, has no bars beside it.
@@ -335,12 +344,20 @@ struct HubView: View {
         let bar = device.platform == .android || !device.isPhysical ? Self.barHeight : 0
         let pictureHeight = detail.height - bar
         guard pictureHeight > 0 else { return }
+        let aspect = size.width / size.height
         // the tools column is a share of the width (but never narrower than its content), see splitWidths
-        let target = WindowSizing.detailWidth(pictureHeight: pictureHeight, aspect: size.width / size.height,
-                                              showsInspector: showInspector, inspectorFraction: CGFloat(inspectorFraction),
-                                              inspectorMinimum: inspectorMin)
+        let target = WindowSizing.detailWidth(pictureHeight: pictureHeight, aspect: aspect, showsInspector: showInspector,
+                                              inspectorFraction: CGFloat(inspectorFraction), inspectorMinimum: inspectorMin)
+        let picture = pictureHeight * aspect
         let sidebar = columnVisibility == .detailOnly ? 0 : windowFit.sidebarWidth
-        windowFit.setWidth(sidebar + target, duration: 0.28)
+        guard windowFit.setWidth(sidebar + target, duration: Self.panelDuration) else { return }
+        pinnedSplit = PinnedSplit(mirror: picture, inspector: showInspector ? max(target - picture, 0) : 0)
+        pinGeneration += 1
+        let generation = pinGeneration
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(Self.panelDuration + 0.15))
+            if pinGeneration == generation { pinnedSplit = nil }
+        }
     }
 
     private var logMode: PanelMode { PanelMode(rawValue: logModeRaw) ?? .hidden }
@@ -381,21 +398,27 @@ struct HubView: View {
         case .start: Task { await list.perform(.start, on: device) }
         case .startHeadless: Task { await list.perform(.startHeadless, on: device) }
         case .stop: Task { await list.perform(.stop, on: device) }
-        case .showMirror: showMirror.toggle()
+        case .showMirror: changePanels { showMirror.toggle() }
         case .showLogs: panel(.logs)
         case .showNetwork: panel(.network)
-        case .showTools: showInspector.toggle()
+        case .showTools: changePanels { showInspector.toggle() }
         }
     }
 
     private func togglePanel(_ kind: PanelKind, on: Bool) {
-        if on {
-            showInspector = true
-            panelKindRaw = kind.rawValue
-            logModeRaw = (logMode == .hidden ? PanelMode.split : logMode).rawValue
-        } else if panelKind == kind {
-            logModeRaw = PanelMode.hidden.rawValue
+        changePanels {
+            if on {
+                showInspector = true
+                panelKindRaw = kind.rawValue
+                logModeRaw = (logMode == .hidden ? PanelMode.split : logMode).rawValue
+            } else if panelKind == kind {
+                logModeRaw = PanelMode.hidden.rawValue
+            }
         }
+    }
+
+    private func setLogMode(_ mode: PanelMode) {
+        changePanels { logModeRaw = mode.rawValue }
     }
 
     /// What the tools column needs: its cards fit in 340, but the logs and network tables need room for their columns.
@@ -407,6 +430,7 @@ struct HubView: View {
     /// than its content needs.
     private func splitWidths(total: CGFloat) -> (mirror: CGFloat, inspector: CGFloat) {
         guard showMirror else { return (0, total) }
+        if let pinnedSplit { return (pinnedSplit.mirror, pinnedSplit.inspector) }
         guard showInspector else { return (total, 0) }
         let inspector = min(max(total * inspectorFraction, inspectorMin), max(total - Self.mirrorMin, inspectorMin))
         return (total - inspector, inspector)
