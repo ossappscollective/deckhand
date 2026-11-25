@@ -6,6 +6,8 @@ All notable changes to Deckhand are documented here.
 
 ### Added
 
+- Right-click (or control-click) the menu bar icon for a menu: open the Deckhand window, the running simulators and emulators (each opens the window on it), refresh, Settings, About and Quit
+- The menu bar icon shows when a simulator or emulator is running: the phone gets radio waves and, if you like, the number of running devices. Settings → General → Menu bar turns it to icon only or off
 - Homebrew: `brew tap ossappscollective/deckhand https://github.com/ossappscollective/deckhand`, then `brew install --cask deckhand`. The release workflow rewrites `Casks/deckhand.rb` for every release
 - When an action needs scrcpy, Baguette or bundletool and it is not installed, Deckhand explains what it is for and opens a popover with a link to the project and the `brew install` command (in the mirror bar, the **…** menu, the camera section, the log panel and the notices)
 - Network panel: capture and inspect the HTTP and HTTPS requests of iOS simulators and Android devices, with search (URL, headers, bodies, regex), method/status/app filters, headers, query parameters, request and response bodies, pretty JSON and image previews, timing, copy (URL, cURL, headers, bodies) and save response

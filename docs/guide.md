@@ -168,6 +168,12 @@ cd DeckhandCore
 swift test
 ```
 
+## Menu bar icon
+
+Click it for the device popover. Right-click (or control-click) it for a menu: **Open Deckhand**, the running simulators and emulators (choose one to open the window on it), **Refresh Devices**, **Settings…**, **About Deckhand** and **Quit Deckhand**.
+
+The icon shows when something is running: the phone gets radio waves, and the number of running simulators and emulators appears beside it. It follows the menu bar's own tint, so it looks right on any wallpaper. **Settings → General → Menu bar** switches the number off or turns the indicator off. With the indicator on, Deckhand checks the device list every 5 seconds in the background even when the popover is closed; with it off, only while the popover is open.
+
 ## Missing optional tools
 
 scrcpy, Baguette and bundletool are open source programs that Deckhand uses when they are installed. When you ask for something that needs one that is missing, a **How to install** (or **Install …**) button opens a popover with what the tool gives you, a link to its project and the `brew install` command to copy. Android still mirrors without scrcpy, through adb, and a simulator is view-only without Baguette.
