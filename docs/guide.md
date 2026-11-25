@@ -73,7 +73,8 @@ The window icon in the panel header (or **Open in the Deckhand window** on a dev
 | ⌘← / ⌘→ | Rotate left / right (Android; simulators need Baguette) |
 | ⇧⌘A | Toggle dark mode |
 | ⌥⌘= / ⌥⌘- | Larger / smaller text |
-| ⌘S | Screenshot |
+| ⌘S | Screenshot (saved, and shown in the Finder) |
+| ⌃S | Screenshot with Thumbnail: saved, and a thumbnail slides in at the bottom right of the screen like macOS's own screenshot tool. Drag it into any app or folder, click it to open the file, right-click for Show in Finder, Copy and Move to Trash. It goes away by itself after a few seconds |
 | ⌥⌘R | Start / stop recording |
 | ⌥⌘1 … 4 | Show the mirror, logs, network, tools |
 

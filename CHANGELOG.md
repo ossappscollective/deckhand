@@ -6,6 +6,7 @@ All notable changes to Deckhand are documented here.
 
 ### Added
 
+- Device → **Screenshot with Thumbnail** (⌃S): takes the screenshot and shows a thumbnail in the bottom-right corner, like macOS's own screenshot tool: drag it into any app or folder, click it to open the file, right-click for Show in Finder, Copy and Move to Trash. It goes away by itself after a few seconds
 - In the Deckhand window, Start boots a device headless (the mirror is its screen) and Start with Window opens the Simulator app or the emulator window as well
 - Popover: **Start in Deckhand** (headless, opens the window on the device), **Start in Background** and **Start with Simulator/Emulator Window** in a device's **…** menu; the right-click menu has a **Start in Deckhand** list of the stopped devices
 - Popover: click a device to open it, double-click to open it the other way (the Deckhand window, or the Simulator app or emulator window); Settings picks which one the click does
