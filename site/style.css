@@ -195,6 +195,11 @@ h2 { margin: 0 0 16px; font: 700 clamp(30px, 4.2vw, 48px)/1.08 var(--display); l
 .strip { padding: 36px 0 0; }
 .strip p { text-align: center; font-size: 14px; color: var(--muted); margin: 0 0 14px; }
 .strip ul { list-style: none; display: flex; flex-wrap: wrap; gap: 10px 14px; justify-content: center; margin: 0; padding: 0; }
+.strip ul + ul { margin-top: 10px; }
+.strip li a { display: inline-flex; align-items: center; gap: 7px; color: inherit; text-decoration: none; }
+.strip li:has(a) { transition: border-color .15s, color .15s; }
+.strip li:has(a):hover { border-color: var(--accent); color: var(--fg); }
+.strip li svg { width: 15px; height: 15px; }
 .strip li { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font: 500 13.5px var(--mono); color: var(--muted); }
 
 .spot { display: grid; grid-template-columns: 1fr 1.05fr; gap: 64px; align-items: center; }
