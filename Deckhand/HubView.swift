@@ -90,15 +90,11 @@ struct HubView: View {
                                                    perform: { perform($0) }))
         .onChange(of: router.selection) { _, _ in creating = nil }
         .background(WindowAccessor { windowFit.attach($0) })
-        // a panel shown or hidden: the window takes the width, so the picture keeps its size
-        .onChange(of: panelLayout) { _, _ in
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(450))   // the sidebar and the columns settle first
-                fitWindowToPicture()
-            }
-        }
+        // a panel shown or hidden: the window takes the width at the same time, so the picture keeps its size
+        .onChange(of: panelLayout) { _, _ in fitWindowToPicture() }
+        .animation(Self.panelAnimation, value: animatedLayout)
         .onChange(of: aspectLock, initial: true) { _, lock in
-            windowFit.lockedAspect = lock
+            windowFit.keepsShape = lock
             windowFit.barHeight = selected.map { $0.platform == .android || !$0.isPhysical } == true ? Self.barHeight : 0
         }
         .onAppear {
@@ -203,7 +199,7 @@ struct HubView: View {
                     if showMirror {
                         MirrorPane(device: device, controller: mirror)
                             .frame(width: split.mirror)
-                        if showInspector { splitHandle(total: geometry.size.width, inspector: split.inspector) }
+                        if showInspector { splitHandle(total: geometry.size.width, inspector: split.inspector).transition(.opacity) }
                     }
                     if showInspector || !showMirror {
                         VStack(spacing: 0) {
@@ -229,16 +225,18 @@ struct HubView: View {
                                 }
                                     .frame(height: logMode == .split ? min(logHeight, max(geometry.size.height - 160, 120)) : nil)
                                     .frame(maxHeight: logMode == .full ? .infinity : nil)
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
                         }
                         .frame(width: split.inspector)
                         .background(.background.secondary)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .leading)
             }
             // narrower than this, the picture or the tools column would be pushed out of the window
-            .onGeometryChange(for: CGSize.self, of: { $0.size }) { windowFit.detailSize = $0 }
+            .onGeometryChange(for: CGSize.self, of: { $0.size }) { windowFit.measured(detail: $0, sidebarVisible: columnVisibility != .detailOnly) }
             .frame(minWidth: (showMirror ? Self.mirrorMin : 0) + (showInspector || !showMirror ? inspectorMin : 0))
             .task(id: LogKey(deviceId: device.id, running: device.state == .running,
                              visible: logMode != .hidden && panelKind == .logs && (showInspector || !showMirror))) {
@@ -308,13 +306,25 @@ struct HubView: View {
         PanelLayout(mirror: showMirror, inspector: showInspector, sidebar: columnVisibility != .detailOnly, logs: logMode != .hidden)
     }
 
-    /// The picture's width over its height while dragging the window's edges should keep it: only the mirror is in the
-    /// window, and the picture is a portrait one.
-    private var aspectLock: CGFloat? {
+    /// What the panels' own animation follows (the sidebar has the system's).
+    private struct AnimatedLayout: Equatable {
+        let mirror: Bool
+        let inspector: Bool
+        let logs: String
+    }
+
+    private var animatedLayout: AnimatedLayout {
+        AnimatedLayout(mirror: showMirror, inspector: showInspector, logs: logModeRaw)
+    }
+
+    static let panelAnimation = Animation.easeInOut(duration: 0.28)
+
+    /// Whether a drag of a corner of the window keeps the picture's shape: only a portrait picture is in the window.
+    private var aspectLock: Bool {
         guard showMirror, !showInspector, columnVisibility == .detailOnly, creating == nil,
               let device = selected, device.state == .running, mirror.state == .live,
-              let size = mirror.displaySize, size.height > size.width else { return nil }
-        return size.width / size.height
+              let size = mirror.displaySize else { return false }
+        return size.height > size.width
     }
 
     /// Gives the window the width at which the picture, with the height it has now, has no bars beside it.
@@ -329,7 +339,8 @@ struct HubView: View {
         let target = WindowSizing.detailWidth(pictureHeight: pictureHeight, aspect: size.width / size.height,
                                               showsInspector: showInspector, inspectorFraction: CGFloat(inspectorFraction),
                                               inspectorMinimum: inspectorMin)
-        windowFit.resizeWidth(by: target - detail.width)
+        let sidebar = columnVisibility == .detailOnly ? 0 : windowFit.sidebarWidth
+        windowFit.setWidth(sidebar + target, duration: 0.28)
     }
 
     private var logMode: PanelMode { PanelMode(rawValue: logModeRaw) ?? .hidden }

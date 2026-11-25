@@ -4,29 +4,34 @@ import Testing
 
 private let chrome = CGSize(width: 0, height: 52)
 
-@Test func draggingTheWidthDrivesTheHeightAtThePicturesShape() {
-    // a 9:19.5 picture; the window is 300 wide with a 52 high titlebar and a 36 high bar
-    let aspect: CGFloat = 9 / 19.5
-    let size = WindowSizing.constrained(proposed: CGSize(width: 360, height: 700), current: CGSize(width: 300, height: 700),
-                                        chrome: chrome, bar: 36, aspect: aspect, minimum: CGSize(width: 200, height: 300))
-    #expect(size.width == 360)
-    #expect(abs((size.width) / (size.height - 52 - 36) - aspect) < 0.0001)
+@Test func onlyADragOfACornerChangesBothSides() {
+    let current = CGSize(width: 300, height: 700)
+    #expect(WindowSizing.isCornerDrag(proposed: CGSize(width: 340, height: 740), current: current))
+    #expect(!WindowSizing.isCornerDrag(proposed: CGSize(width: 340, height: 700), current: current))
+    #expect(!WindowSizing.isCornerDrag(proposed: CGSize(width: 300, height: 650), current: current))
 }
 
-@Test func draggingTheHeightDrivesTheWidth() {
-    let aspect: CGFloat = 0.5
-    let size = WindowSizing.constrained(proposed: CGSize(width: 300, height: 788), current: CGSize(width: 300, height: 600),
-                                        chrome: chrome, bar: 36, aspect: aspect, minimum: CGSize(width: 100, height: 100))
-    #expect(size.height == 788)
-    #expect(size.width == (788 - 52 - 36) * aspect)
+@Test func aCornerDragStartsWithoutAJump() {
+    let current = CGSize(width: 300, height: 700)
+    let size = WindowSizing.scaled(proposed: CGSize(width: 301, height: 701), current: current, chrome: chrome, bar: 36,
+                                   minimum: CGSize(width: 200, height: 300))
+    #expect(abs(size.width - 301) < 2 && abs(size.height - 701) < 2)
+}
+
+@Test func aCornerDragKeepsTheShapeOfThePictureItStartedWith() {
+    let current = CGSize(width: 300, height: 52 + 36 + 600)   // the picture is 300 x 600
+    let size = WindowSizing.scaled(proposed: CGSize(width: 450, height: 700), current: current, chrome: chrome, bar: 36,
+                                   minimum: CGSize(width: 100, height: 100))
+    let picture = CGSize(width: size.width - chrome.width, height: size.height - chrome.height - 36)
+    #expect(abs(picture.width / picture.height - 0.5) < 0.0001)
 }
 
 @Test func aSizeBelowTheMinimumKeepsTheShape() {
-    let aspect: CGFloat = 0.5
-    let size = WindowSizing.constrained(proposed: CGSize(width: 100, height: 200), current: CGSize(width: 300, height: 600),
-                                        chrome: chrome, bar: 36, aspect: aspect, minimum: CGSize(width: 220, height: 360))
-    #expect(size.width >= 220 && size.height >= 360)
-    #expect(abs(size.width / (size.height - 52 - 36) - aspect) < 0.0001)
+    let current = CGSize(width: 300, height: 52 + 36 + 600)
+    let size = WindowSizing.scaled(proposed: CGSize(width: 100, height: 200), current: current, chrome: chrome, bar: 36,
+                                   minimum: CGSize(width: 220, height: 360))
+    #expect(size.width >= 220 - 0.001 && size.height >= 360 - 0.001)
+    #expect(abs(size.width / (size.height - 52 - 36) - 0.5) < 0.0001)
 }
 
 @Test func theWindowWidthForAPictureWithoutTheToolsColumnIsThePicturesWidth() {

@@ -4,11 +4,11 @@ import SwiftUI
 
 /// Keeps the Deckhand window the shape of the picture it shows, in the two cases where that is wanted:
 ///
-///  * `resizeWidth(by:)`: once, when a panel is shown or hidden. The height stays, the left and top edges stay, and the
-///    width follows, so the picture keeps its size and no black bars appear beside it.
-///  * `lockedAspect`: while only a portrait picture is in the window, dragging an edge or a corner keeps the picture's
-///    shape. It is a delegate method that only adjusts the size AppKit is about to apply (`windowWillResize`), so nothing
-///    sets the frame during a drag.
+///  * `setWidth(_:)`: once, when a panel is shown or hidden, animated with the panel. The height stays, the left and top
+///    edges stay, and the width follows, so the picture keeps its size and no black bars appear beside it.
+///  * `keepsShape`: while only a portrait picture is in the window, dragging a corner keeps the picture's shape. It is a
+///    delegate method that only adjusts the size AppKit is about to apply (`windowWillResize`), so nothing sets the frame
+///    during a drag. Dragging an edge is the window's own, free resize.
 ///
 /// Everything else (a landscape picture, panels open) is left to the window's own resizing.
 @MainActor
@@ -17,8 +17,20 @@ final class WindowFit {
     var detailSize: CGSize = .zero
     /// Height of the strip under the picture, when there is one.
     var barHeight: CGFloat = 0
-    /// Width over height of the picture while resizing should keep it; nil when resizing is free.
-    var lockedAspect: CGFloat?
+    /// Whether a drag of a corner keeps the picture's shape.
+    var keepsShape = false
+    /// Width of the sidebar when it is showing, as last measured.
+    private(set) var sidebarWidth: CGFloat = 240
+    private var animatingUntil = Date.distantPast
+
+    /// Called with the detail column's size whenever it changes.
+    func measured(detail: CGSize, sidebarVisible: Bool) {
+        detailSize = detail
+        // not while the window or the sidebar is moving: those widths are on their way
+        guard sidebarVisible, Date() > animatingUntil, let window else { return }
+        let width = window.frame.width - detail.width
+        if (150...420).contains(width) { sidebarWidth = width }
+    }
 
     private weak var window: NSWindow?
     private var proxy: FitDelegate?
@@ -54,22 +66,27 @@ final class WindowFit {
                         height: window.frame.height - (detailSize.height - barHeight))
     }
 
-    /// Changes the width of the window by `delta`, animated, with the top-left corner where it is, and keeps it on the screen.
-    func resizeWidth(by delta: CGFloat) {
+    /// Gives the window `width`, animated alongside the panels, with the top-left corner where it is, and keeps it on the screen.
+    func setWidth(_ width: CGFloat, duration: TimeInterval) {
         guard let window, !window.styleMask.contains(.fullScreen), !window.isZoomed,
               let visible = (window.screen ?? NSScreen.main)?.visibleFrame else { return }
         var frame = window.frame
-        frame.size.width = max(min(frame.width + delta, visible.width), window.minSize.width)
+        frame.size.width = max(min(width, visible.width), window.minSize.width)
         if frame.maxX > visible.maxX { frame.origin.x = max(visible.minX, visible.maxX - frame.width) }
         guard abs(frame.width - window.frame.width) > 1 else { return }
-        window.setFrame(frame, display: true, animate: true)
+        animatingUntil = Date().addingTimeInterval(duration + 0.3)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().setFrame(frame, display: true)
+        }
     }
 
-    /// The size the window should take instead of `proposed`, so that the picture keeps its shape.
+    /// The size the window should take instead of `proposed`: a corner drag keeps the picture's shape, an edge drag is free.
     fileprivate func constrained(_ proposed: NSSize, in window: NSWindow) -> NSSize {
-        guard let aspect = lockedAspect, aspect > 0 else { return proposed }
-        return WindowSizing.constrained(proposed: proposed, current: window.frame.size, chrome: chrome, bar: barHeight,
-                                        aspect: aspect, minimum: window.minSize)
+        guard keepsShape, WindowSizing.isCornerDrag(proposed: proposed, current: window.frame.size) else { return proposed }
+        return WindowSizing.scaled(proposed: proposed, current: window.frame.size, chrome: chrome, bar: barHeight,
+                                   minimum: window.minSize)
     }
 }
 

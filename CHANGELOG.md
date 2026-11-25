@@ -7,7 +7,8 @@ All notable changes to Deckhand are documented here.
 ### Added
 
 - Showing or hiding the sidebar, the mirror, the tools column or the log panel gives the window the width at which the picture keeps its size, so no black bars appear beside it (the height and the top-left corner stay)
-- With only a portrait picture in the window, dragging an edge or a corner keeps the picture's shape. Landscape pictures and windows with panels resize freely
+- The window grows and shrinks together with the panels (the sidebar, the mirror, the tools column, the logs and network panels slide in and out) instead of after them
+- With only a portrait picture in the window, dragging a corner keeps the picture's shape, smoothly; dragging an edge resizes freely, and so do landscape pictures and windows with panels
 - Device → **Screenshot with Thumbnail** (⌃S): takes the screenshot and shows a thumbnail in the bottom-right corner, like macOS's own screenshot tool. It is not saved to the capture folder: the file is in a temporary folder (kept 3 days) and is for dragging into an app or folder. Swipe it to the right (or wait a few seconds) to send it away, click it to open the file, right-click for Save, Show in Finder, Copy and Move to Trash
 - In the Deckhand window, Start boots a device headless (the mirror is its screen) and Start with Window opens the Simulator app or the emulator window as well
 - Popover: **Start in Deckhand** (headless, opens the window on the device), **Start in Background** and **Start with Simulator/Emulator Window** in a device's **…** menu; the right-click menu has a **Start in Deckhand** list of the stopped devices
