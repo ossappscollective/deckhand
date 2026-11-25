@@ -32,6 +32,7 @@ final class WindowFit {
         if (150...420).contains(width) { sidebarWidth = width }
     }
 
+    private static let narrowest: CGFloat = 200
     private weak var window: NSWindow?
     private var proxy: FitDelegate?
     private var observer: NSObjectProtocol?
@@ -71,7 +72,10 @@ final class WindowFit {
         guard let window, !window.styleMask.contains(.fullScreen), !window.isZoomed,
               let visible = (window.screen ?? NSScreen.main)?.visibleFrame else { return }
         var frame = window.frame
-        frame.size.width = max(min(width, visible.width), window.minSize.width)
+        frame.size.width = max(min(width, visible.width), Self.narrowest)
+        // the window's minimum is still the one of the layout that is going away (the sidebar and the picture, say); the
+        // layout that comes has a lower one and puts it back when it is in place
+        if frame.width < window.minSize.width { window.minSize.width = frame.width }
         if frame.maxX > visible.maxX { frame.origin.x = max(visible.minX, visible.maxX - frame.width) }
         guard abs(frame.width - window.frame.width) > 1 else { return }
         animatingUntil = Date().addingTimeInterval(duration + 0.3)

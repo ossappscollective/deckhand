@@ -24,7 +24,7 @@ struct HubView: View {
     @State private var creating: Platform?
     @State private var mirror = MirrorController()
     @State private var deleting: Device?
-    @State private var columnVisibility = NavigationSplitViewVisibility.automatic
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var windowFit = WindowFit()
 
     var body: some View {
