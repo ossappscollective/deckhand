@@ -43,7 +43,7 @@ final class ScreenshotThumbnail {
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.3
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrameOrigin(resting)
+            panel.animator().setFrame(NSRect(origin: resting, size: size), display: true)
         }
         scheduleDismissal()
     }
@@ -71,7 +71,9 @@ final class ScreenshotThumbnail {
         }
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.25
-            panel.animator().setFrameOrigin(NSPoint(x: screen.visibleFrame.maxX, y: panel.frame.minY))
+            var gone = panel.frame
+            gone.origin.x = screen.visibleFrame.maxX
+            panel.animator().setFrame(gone, display: true)
         }, completionHandler: {
             panel.orderOut(nil)
         })
