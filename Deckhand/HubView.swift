@@ -242,7 +242,13 @@ struct HubView: View {
                                     .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
                         }
+                        // laid out at the width it will have; while the window grows, only as much of it as there is room
+                        // for shows, so nothing is ever wider than the window
                         .frame(width: split.inspector)
+                        .frame(width: pinnedSplit == nil ? split.inspector
+                                                         : max(0, min(split.inspector, geometry.size.width - split.mirror - 1)),
+                               alignment: .leading)
+                        .clipped()
                         .animation(nil, value: split.inspector)
                         .background(.background.secondary)
                         .transition(.opacity)
