@@ -9,15 +9,20 @@ name: Release
 #                                       artifact (signed and notarized when the secrets exist,
 #                                       unsigned otherwise, so forks and pull requests still work)
 #
-# Secrets (same names as the Tauri release workflow):
+# Secrets:
 #   APPLE_CERTIFICATE           base64 of the "Developer ID Application" .p12
 #   APPLE_CERTIFICATE_PASSWORD  password of that .p12
-#   APPLE_IDENTITY_ID           signing identity, e.g. "Developer ID Application: Name (TEAMID)"
-#                               (optional: the first Developer ID identity in the .p12 is used if empty)
-#   APPLE_ID                    Apple ID e-mail used for notarization
+#   APPLE_SIGNING_IDENTITY      e.g. "Developer ID Application: Name (TEAMID)" (optional: the first Developer ID
+#                               identity in the .p12 is used if empty; APPLE_IDENTITY_ID is read as a fallback)
+# and, to notarize, either an App Store Connect API key (preferred)
+#   APPLE_API_KEY               the key id
+#   APPLE_API_ISSUER            the issuer id
+#   APPLE_API_KEY_CONTENT       the contents of the AuthKey_XXXX.p8 file (PEM text, or base64 of it)
+# or an Apple ID
+#   APPLE_ID                    Apple ID e-mail
 #   APPLE_PASSWORD              app-specific password for that Apple ID
 #   APPLE_TEAM_ID               10 character team id
-# APPLE_PROVIDER_SHORT_NAME is not needed: notarytool only wants the team id.
+# The team id is read from the signing identity when APPLE_TEAM_ID is not set.
 
 on:
   push:
@@ -68,6 +73,10 @@ jobs:
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       APPLE_IDENTITY_ID: ${{ secrets.APPLE_IDENTITY_ID }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -101,9 +110,15 @@ jobs:
         run: |
           set -euo pipefail
           missing=()
-          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD; do
             [ -n "${!name}" ] || missing+=("$name")
           done
+          # notarization: an API key, or an Apple ID
+          if [ -z "$APPLE_API_KEY" ] || [ -z "$APPLE_API_ISSUER" ] || [ -z "$APPLE_API_KEY_CONTENT" ]; then
+            for name in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+              [ -n "${!name}" ] || missing+=("$name (or APPLE_API_KEY, APPLE_API_ISSUER and APPLE_API_KEY_CONTENT)")
+            done
+          fi
           if [ ${#missing[@]} -eq 0 ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -187,7 +202,7 @@ jobs:
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           rm -f "$RUNNER_TEMP/certificate.p12"
 
-          identity="$APPLE_IDENTITY_ID"
+          identity="${APPLE_SIGNING_IDENTITY:-$APPLE_IDENTITY_ID}"
           if [ -z "$identity" ]; then
             identity=$(security find-identity -v -p codesigning "$keychain" \
               | grep 'Developer ID Application' | head -1 | sed -E 's/^ *[0-9]+\) ([0-9A-F]+) .*/\1/')
@@ -197,6 +212,34 @@ jobs:
             exit 1
           fi
           echo "SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+          # the team id: the secret, or the "(TEAMID)" at the end of the identity's name
+          team="$APPLE_TEAM_ID"
+          if [ -z "$team" ]; then
+            team=$(security find-identity -v -p codesigning "$keychain" \
+              | grep -F "$identity" | head -1 | sed -nE 's/.*\(([A-Z0-9]{10})\)".*/\1/p' || true)
+          fi
+          if [ -z "$team" ]; then
+            team=$(security find-identity -v -p codesigning "$keychain" \
+              | grep 'Developer ID Application' | head -1 | sed -nE 's/.*\(([A-Z0-9]{10})\)".*/\1/p' || true)
+          fi
+          if [ -z "$team" ]; then
+            echo "::error::Could not work out the team id: set APPLE_TEAM_ID"
+            exit 1
+          fi
+          echo "APPLE_TEAM_ID=$team" >> "$GITHUB_ENV"
+
+          # the notary API key, as the .p8 file notarytool wants
+          if [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_ISSUER" ] && [ -n "$APPLE_API_KEY_CONTENT" ]; then
+            key_path="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY.p8"
+            if printf '%s' "$APPLE_API_KEY_CONTENT" | grep -q 'BEGIN PRIVATE KEY'; then
+              printf '%s\n' "$APPLE_API_KEY_CONTENT" > "$key_path"
+            else
+              printf '%s' "$APPLE_API_KEY_CONTENT" | base64 --decode > "$key_path"
+            fi
+            chmod 600 "$key_path"
+            echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+          fi
           security find-identity -v -p codesigning "$keychain"
 
       - name: Build
@@ -318,6 +361,7 @@ jobs:
           if [ -n "${KEYCHAIN_PATH:-}" ]; then
             security delete-keychain "$KEYCHAIN_PATH" || true
           fi
+          rm -f "${APPLE_API_KEY_PATH:-}"
 
   # Homebrew: `brew tap ossappscollective/deckhand https://github.com/ossappscollective/deckhand`, then
   # `brew install --cask deckhand`. The cask lives in this repository (Casks/deckhand.rb) and is rewritten
