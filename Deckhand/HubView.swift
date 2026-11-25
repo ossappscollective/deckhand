@@ -95,7 +95,15 @@ struct HubView: View {
         .onChange(of: router.selection) { _, _ in creating = nil }
         .background(WindowAccessor { windowFit.attach($0) })
         // a panel shown or hidden: the window takes the width at the same time, so the picture keeps its size
-        .onChange(of: columnVisibility) { _, _ in fitWindowToPicture() }
+        .onChange(of: columnVisibility) { _, _ in
+            fitWindowToPicture()
+            // the sidebar comes back at the width it had; once it is there, correct what was guessed
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                windowFit.refreshSidebarWidth()
+                fitWindowToPicture()
+            }
+        }
         .animation(Self.panelAnimation, value: animatedLayout)
         .onChange(of: aspectLock, initial: true) { _, lock in
             windowFit.keepsShape = lock
@@ -244,7 +252,7 @@ struct HubView: View {
                 .clipped()
             }
             // narrower than this, the picture or the tools column would be pushed out of the window
-            .onGeometryChange(for: CGSize.self, of: { $0.size }) { windowFit.measured(detail: $0, sidebarVisible: columnVisibility != .detailOnly) }
+            .onGeometryChange(for: CGSize.self, of: { $0.size }) { windowFit.measured(detail: $0) }
             .frame(minWidth: (showMirror ? Self.mirrorMin : 0) + (showInspector || !showMirror ? inspectorMin : 0))
             .task(id: LogKey(deviceId: device.id, running: device.state == .running,
                              visible: logMode != .hidden && panelKind == .logs && (showInspector || !showMirror))) {

@@ -23,21 +23,35 @@ final class WindowFit {
     private(set) var sidebarWidth: CGFloat = 240
     private var animatingUntil = Date.distantPast
 
-    /// Called with the detail column's size whenever it changes.
-    func measured(detail: CGSize, sidebarVisible: Bool) {
-        detailSize = detail
-        // not while the window or the sidebar is moving: those widths are on their way
-        guard sidebarVisible, Date() > animatingUntil, let window else { return }
-        let width = window.frame.width - detail.width
-        if (150...420).contains(width) { sidebarWidth = width }
-    }
-
     private static let narrowest: CGFloat = 200
     private weak var window: NSWindow?
     private var proxy: FitDelegate?
     private var observer: NSObjectProtocol?
     /// What the window has besides the picture, taken when a resize starts.
     private var chrome = CGSize.zero
+
+    /// Called with the detail column's size whenever it changes.
+    func measured(detail: CGSize) {
+        detailSize = detail
+        refreshSidebarWidth()
+    }
+
+    /// Reads the sidebar's width from the split view that holds it: only while it is showing and nothing is moving, since
+    /// a width taken on the way would make the window too narrow or too wide the next time the sidebar comes back.
+    func refreshSidebarWidth() {
+        guard Date() > animatingUntil, let split = Self.sidebarSplitView(in: window?.contentView),
+              let sidebar = split.arrangedSubviews.first, !split.isSubviewCollapsed(sidebar) else { return }
+        if (150...420).contains(sidebar.frame.width) { sidebarWidth = sidebar.frame.width }
+    }
+
+    private static func sidebarSplitView(in view: NSView?) -> NSSplitView? {
+        guard let view else { return nil }
+        if let split = view as? NSSplitView, split.isVertical, split.arrangedSubviews.count >= 2 { return split }
+        for sub in view.subviews {
+            if let found = sidebarSplitView(in: sub) { return found }
+        }
+        return nil
+    }
 
     func attach(_ window: NSWindow?) {
         guard let window else { return }
@@ -79,7 +93,11 @@ final class WindowFit {
         if frame.width < window.minSize.width { window.minSize.width = frame.width }
         if frame.maxX > visible.maxX { frame.origin.x = max(visible.minX, visible.maxX - frame.width) }
         guard abs(frame.width - window.frame.width) > 1 else { return false }
-        animatingUntil = Date().addingTimeInterval(duration + 0.3)
+        animatingUntil = Date().addingTimeInterval(duration + 0.6)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(duration + 0.7))
+            self?.refreshSidebarWidth()
+        }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = duration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
