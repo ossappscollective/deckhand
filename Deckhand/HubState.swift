@@ -2,6 +2,23 @@ import AppKit
 import DeckhandCore
 import SwiftUI
 
+/// The app is a menu bar agent: no Dock icon and no place in the app switcher, until a window opens. Becoming a regular app
+/// and being the front one are two steps, and the second only counts once the first has settled; done at once, the app
+/// shows in the Dock without being in the Command-Tab ring, and the window is not the one that is in front.
+@MainActor
+enum AppActivation {
+    static func bringToFront() {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(200))
+            NSApp.activate(ignoringOtherApps: true)
+            let hub = NSApp.windows.first { !($0 is NSPanel) && $0.canBecomeMain && $0.isVisible && $0.title == "Deckhand" }
+            hub?.makeKeyAndOrderFront(nil)
+        }
+    }
+}
+
 /// Which device the Deckhand window shows; set by the popover when it hands over.
 @MainActor
 @Observable
@@ -113,7 +130,7 @@ struct MenuBarLabel: View {
     }
 
     private func showWindow() {
-        NSApp.activate(ignoringOtherApps: true)
+        AppActivation.bringToFront()
         openWindow(id: "hub")
     }
 

@@ -63,6 +63,11 @@ final class WindowFit {
                 forName: NSWindow.willStartLiveResizeNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.captureChrome() }
             }
+            // the layout is there a moment after the window is: read the sidebar's width once it is
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(600))
+                self?.refreshSidebarWidth()
+            }
         }
         installDelegate(on: window)
     }

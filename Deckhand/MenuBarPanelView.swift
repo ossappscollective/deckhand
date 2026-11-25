@@ -186,7 +186,7 @@ struct MenuBarPanelView: View {
 
     private func openHub(selecting deviceId: String?) {
         if let deviceId { hubRouter.selection = deviceId }
-        NSApp.activate(ignoringOtherApps: true)
+        AppActivation.bringToFront()
         openWindow(id: "hub")
     }
 

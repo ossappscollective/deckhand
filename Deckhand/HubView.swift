@@ -121,8 +121,7 @@ struct HubView: View {
         .onChange(of: networkPort, initial: true) { _, port in network.preferredPort = port > 0 ? port : nil }
                 // the app is a menu bar agent; while this window is open it also gets a Dock icon
         .onAppear {
-            NSApp.setActivationPolicy(.regular)
-            NSApp.activate(ignoringOtherApps: true)
+            AppActivation.bringToFront()
         }
         .onDisappear {
             NSApp.setActivationPolicy(.accessory)
@@ -352,6 +351,7 @@ struct HubView: View {
 
     /// Gives the window the width at which the picture, with the height it has now, has no bars beside it.
     private func fitWindowToPicture() {
+        windowFit.refreshSidebarWidth()   // the sidebar may never have been measured, if it has not changed since the window opened
         guard showMirror, creating == nil, let device = selected, device.state == .running, mirror.state == .live,
               let size = mirror.displaySize, size.width > 0, size.height > 0 else { return }
         let detail = windowFit.detailSize
