@@ -168,7 +168,7 @@ private let listApps = """
 @Test func currentAppExplainsWhyItCannotAnswer() async {
     let runner = MockShellRunner()
     let sim = Device(id: "U", name: "U", platform: .ios, osVersion: "iOS", state: .running)
-    await #expect(throws: LogAppDiscoveryError.self) {
+    await #expect(throws: MissingToolError(.baguette, for: "Finding the foreground app")) {
         _ = try await LogAppDiscovery(runner: runner, sdk: nil, baguette: nil).currentApp(on: sim)
     }
     runner.responses["/b describe-ui --udid U"] = .success(#"{"label":" "}"#)

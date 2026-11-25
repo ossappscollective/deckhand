@@ -132,7 +132,13 @@ struct LogPanelView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .overlay(alignment: .bottomTrailing) {
-            if let message = model.discoveryMessage {
+            if let tool = model.discoveryMissingTool {
+                HStack(spacing: 6) {
+                    Text("Needs \(tool.displayName)").font(.system(size: 10)).foregroundStyle(.orange)
+                    InstallToolButton(tool: tool, title: "How to install")
+                }
+                .padding(.trailing, 10).offset(y: 9)
+            } else if let message = model.discoveryMessage {
                 Text(message).font(.system(size: 10)).foregroundStyle(.orange)
                     .padding(.trailing, 10).offset(y: 9)
             }

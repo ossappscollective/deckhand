@@ -43,9 +43,11 @@ struct CameraToolsView: View {
 
     private var missingLibrary: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Hint("The simulator camera uses Baguette's VirtualCamera library. Install it once with:")
-            Text("brew install baguette").font(.system(size: 11, design: .monospaced)).textSelection(.enabled)
-            ToolButton(title: "Check Again") { camera.refreshAvailability() }
+            Hint("The simulator camera uses Baguette's VirtualCamera library, which is not installed.")
+            HStack {
+                InstallToolButton(tool: .baguette, title: "How to install")
+                ToolButton(title: "Check Again") { camera.refreshAvailability() }
+            }
         }
     }
 

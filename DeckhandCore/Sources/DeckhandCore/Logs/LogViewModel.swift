@@ -23,6 +23,8 @@ public final class LogViewModel {
     public private(set) var yourApps: [String] = []
     public private(set) var isFindingApp = false
     public private(set) var discoveryMessage: String?
+    /// The program to install when finding the app failed for lack of it.
+    public private(set) var discoveryMissingTool: OptionalTool?
 
     /// Each device keeps its own filter, restored when you come back to it and across launches.
     public var filter = LogFilter() {
@@ -174,12 +176,14 @@ public final class LogViewModel {
         guard let device, !isFindingApp else { return }
         isFindingApp = true
         discoveryMessage = nil
+        discoveryMissingTool = nil
         defer { isFindingApp = false }
         do {
             let app = try await LogAppDiscovery(runner: runner, sdk: locateSDK()).currentApp(on: device)
             filter.apps = [app]
         } catch {
-            discoveryMessage = String(describing: error)
+            discoveryMessage = (error as? MissingToolError)?.errorDescription ?? String(describing: error)
+            discoveryMissingTool = (error as? MissingToolError)?.tool
         }
     }
 

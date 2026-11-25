@@ -244,8 +244,7 @@ public struct SimulatorTools: Sendable {
     /// interface), so this goes through Baguette.
     public func setOrientation(_ device: Device, _ orientation: SimulatorOrientation) async throws {
         guard let baguette = locateBaguette() else {
-            throw ShellError(command: "baguette", exitCode: 1,
-                             stderr: "Rotating a simulator needs Baguette — run: brew install baguette")
+            throw MissingToolError(.baguette, for: "Rotating a simulator")
         }
         try await runner.run(baguette, ["orientation", "--udid", device.id, orientation.rawValue])
     }
@@ -493,8 +492,7 @@ public struct EmulatorTools: Sendable {
     @discardableResult
     private func bundletool(_ arguments: [String]) async throws -> String {
         guard let tool = locateBundletool() else {
-            throw ShellError(command: "bundletool", exitCode: 1,
-                             stderr: "bundletool is needed for .aab files — run: brew install bundletool")
+            throw MissingToolError(.bundletool, for: "Installing an .aab")
         }
         return try await runner.run(tool, arguments)
     }
@@ -598,7 +596,7 @@ public struct EmulatorTools: Sendable {
 
     public func openScrcpy(_ device: Device, exists: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }) async throws {
         guard let scrcpy = Self.scrcpyCandidates.first(where: exists) else {
-            throw ShellError(command: "scrcpy", exitCode: 1, stderr: "scrcpy is not installed — run: brew install scrcpy")
+            throw MissingToolError(.scrcpy, for: "Opening a scrcpy window")
         }
         try await runner.launchDetached(scrcpy, ["-s", try serial(of: device), "--window-title", device.name],
                                         failureWindow: .seconds(2))

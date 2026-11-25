@@ -56,7 +56,7 @@ struct MenuBarPanelView: View {
     @ViewBuilder
     private var notices: some View {
         if let message = toolsModel.message {
-            noticeBanner(message.text, isError: message.isError) { toolsModel.dismissMessage() }
+            noticeBanner(message.text, isError: message.isError, missingTool: message.missingTool) { toolsModel.dismissMessage() }
                 .task(id: message) {
                     guard !message.isError else { return }
                     try? await Task.sleep(for: .seconds(5))
@@ -68,7 +68,7 @@ struct MenuBarPanelView: View {
         }
     }
 
-    private func noticeBanner(_ text: String, isError: Bool, dismiss: @escaping () -> Void) -> some View {
+    private func noticeBanner(_ text: String, isError: Bool, missingTool: OptionalTool? = nil, dismiss: @escaping () -> Void) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Image(systemName: isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                 .foregroundStyle(isError ? Color.red : Color.green)
@@ -76,6 +76,7 @@ struct MenuBarPanelView: View {
                 .font(.system(size: 11))
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if let missingTool { InstallToolButton(tool: missingTool, title: "How to install") }
             Button(action: dismiss) {
                 Image(systemName: "xmark").foregroundStyle(.secondary)
             }

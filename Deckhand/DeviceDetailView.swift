@@ -150,6 +150,7 @@ struct DeviceManageContent: View {
                 .foregroundStyle(message.isError ? Color.red : Color.green)
             Text(message.text).font(.system(size: 11)).lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if let tool = message.missingTool { InstallToolButton(tool: tool, title: "How to install") }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)

@@ -77,6 +77,8 @@ final class MirrorController {
     private var simStream: SimulatorMirrorSession?
     /// Why a simulator cannot be touched yet ("Preparing input…", or the Baguette install hint).
     private(set) var inputNotice: String?
+    /// A program that would improve this mirror and is not installed: scrcpy for Android, Baguette for a simulator.
+    private(set) var missingTool: OptionalTool?
     private let clipboard = ClipboardSync()
     private var generation = 0
     /// What is feeding the Android picture: "scrcpy" or "adb".
@@ -153,6 +155,7 @@ final class MirrorController {
         simStream?.stop()
         simStream = nil
         inputNotice = nil
+        missingTool = nil
         clipboard.stop()
         engine = nil
         screenSize = nil
@@ -183,16 +186,19 @@ final class MirrorController {
             if let install {
                 self.startScrcpy(sdk: sdk, serial: serial, install: install, token: token)
             } else {
+                self.missingTool = .scrcpy
                 self.startScreenrecord(sdk: sdk, serial: serial)
             }
         }
     }
 
     private static func scrcpyInstall() async -> ScrcpyInstall? {
-        if let cached = cachedScrcpy { return cached }
-        let found = await ScrcpyInstall.locate(runner: ProcessShellRunner())
-        cachedScrcpy = .some(found)
-        return found
+        if let cached = cachedScrcpy, let found = cached { return found }
+        // only a hit is remembered, so installing scrcpy takes effect when the mirror next starts
+        return await ScrcpyInstall.locate(runner: ProcessShellRunner()).map { found in
+            cachedScrcpy = .some(found)
+            return found
+        }
     }
 
     private func startScrcpy(sdk: AndroidSDK, serial: String, install: ScrcpyInstall, token: Int) {
@@ -312,7 +318,8 @@ final class MirrorController {
     /// Touch and keys go through Baguette; without it the simulator stays view-only.
     private func startSimulatorInput(_ device: Device) {
         guard let executable = SimulatorInputSession.locate() else {
-            inputNotice = "View only. For touch and keyboard: brew install baguette"
+            inputNotice = "View only. For touch and keyboard: \(OptionalTool.baguette.installCommand)"
+            missingTool = .baguette
             return
         }
         inputNotice = "Preparing input…"

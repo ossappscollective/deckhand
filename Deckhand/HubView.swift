@@ -262,16 +262,19 @@ struct HubView: View {
     @ViewBuilder
     private func toast(showsAlways: Bool) -> some View {
         if showsAlways, let message = tools.message {
-            Text(message.text)
-                .font(.system(size: 11))
-                .lineLimit(2)
+            HStack(spacing: 8) {
+                Text(message.text)
+                    .font(.system(size: 11))
+                    .lineLimit(2)
+                    .foregroundStyle(message.isError ? Color.red : Color.primary)
+                if let tool = message.missingTool { InstallToolButton(tool: tool, title: "How to install") }
+            }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
                 .background(.regularMaterial, in: Capsule())
-                .foregroundStyle(message.isError ? Color.red : Color.primary)
                 .padding(.bottom, 52)
                 .task(id: message) {
-                    try? await Task.sleep(for: .seconds(message.isError ? 8 : 4))
+                    try? await Task.sleep(for: .seconds(message.missingTool != nil ? 30 : message.isError ? 8 : 4))
                     if tools.message == message { tools.dismissMessage() }
                 }
         }
@@ -439,6 +442,7 @@ private struct MirrorPane: View {
     let controller: MirrorController
     @Environment(DeviceToolsViewModel.self) private var tools
     @Environment(DeviceListViewModel.self) private var list
+    @State private var toolHelp: OptionalTool?
 
     private var key: String { "\(device.id)|\(device.state)" }
 
@@ -538,6 +542,9 @@ private struct MirrorPane: View {
                     simulatorKey(.volumeDown, "speaker.wave.1", "Volume down")
                     simulatorKey(.volumeUp, "speaker.wave.3", "Volume up")
                 }
+            } else if let tool = controller.missingTool {
+                if volume { Text("View only.").font(.system(size: 11)) }
+                InstallToolButton(tool: tool, title: "Touch and keys: install \(tool.displayName)")
             } else if let notice = controller.inputNotice, volume {
                 Text(notice).font(.system(size: 11))
             }
@@ -560,6 +567,9 @@ private struct MirrorPane: View {
                 Text("Mirror engine: \(engine)")
             }
             if device.platform == .android {
+                if let tool = controller.missingTool {
+                    Button("Faster mirror: install \(tool.displayName)…") { toolHelp = tool }
+                }
                 if DeviceTool.scrcpy.isSupported(for: device) {
                     Button("Open scrcpy Window") { Task { await tools.perform(.scrcpy, on: device) } }
                 }
@@ -586,6 +596,7 @@ private struct MirrorPane: View {
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
         .help("More")
+        .popover(item: $toolHelp, arrowEdge: .top) { MissingToolPopover(tool: $0) }
     }
 
     private func simulatorKey(_ button: SimulatorInputSession.Button, _ symbol: String, _ help: String) -> some View {

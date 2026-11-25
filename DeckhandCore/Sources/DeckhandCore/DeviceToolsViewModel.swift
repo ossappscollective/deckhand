@@ -7,6 +7,14 @@ public final class DeviceToolsViewModel {
     public struct Message: Equatable, Sendable {
         public let text: String
         public let isError: Bool
+        /// Set when the failure is a program the user can install.
+        public let missingTool: OptionalTool?
+
+        public init(text: String, isError: Bool, missingTool: OptionalTool? = nil) {
+            self.text = text
+            self.isError = isError
+            self.missingTool = missingTool
+        }
     }
 
     public enum AppsState: Equatable, Sendable {
@@ -89,7 +97,7 @@ public final class DeviceToolsViewModel {
             message = try await run(tool, on: device).map { Message(text: $0, isError: false) }
             if shouldReloadApps(after: tool) { await loadApps(for: device) }
         } catch {
-            message = Message(text: Self.friendlyMessage(error), isError: true)
+            message = Self.failure(error)
         }
         isWorking = false
     }
@@ -271,4 +279,8 @@ public final class DeviceToolsViewModel {
     }
 
     static func friendlyMessage(_ error: Error) -> String { ErrorMessage.friendly(error) }
+
+    static func failure(_ error: Error) -> Message {
+        Message(text: friendlyMessage(error), isError: true, missingTool: (error as? MissingToolError)?.tool)
+    }
 }

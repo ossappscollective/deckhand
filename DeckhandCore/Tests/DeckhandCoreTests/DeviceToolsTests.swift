@@ -314,8 +314,9 @@ private func bundleTools(_ runner: MockShellRunner, bundletool: String? = "/bt/b
     do {
         try await bundleTools(runner, bundletool: nil).install(avd, source: "/tmp/app.aab")
         Issue.record("expected failure")
-    } catch let error as ShellError {
-        #expect(error.stderr.contains("brew install bundletool"))
+    } catch let error as MissingToolError {
+        #expect(error.tool == .bundletool)
+        #expect(error.errorDescription?.contains("brew install bundletool") == true)
     } catch {
         Issue.record("wrong error \(error)")
     }
@@ -428,5 +429,15 @@ private func bundleTools(_ runner: MockShellRunner, bundletool: String? = "/bt/b
 
 @Test func simulatorRotationNeedsBaguette() async throws {
     let tools = SimulatorTools(runner: MockShellRunner(), namer: fixedNamer, temporaryDirectory: "/tmp", locateBaguette: { nil })
-    await #expect(throws: ShellError.self) { try await tools.setOrientation(sim, .landscapeLeft) }
+    await #expect(throws: MissingToolError(.baguette, for: "Rotating a simulator")) { try await tools.setOrientation(sim, .landscapeLeft) }
+}
+
+@MainActor
+@Test func aMissingToolReachesTheMessageWithItsProject() {
+    let message = DeviceToolsViewModel.failure(MissingToolError(.baguette, for: "Rotating a simulator"))
+    #expect(message.isError)
+    #expect(message.missingTool == .baguette)
+    #expect(message.text.contains("brew install baguette"))
+    #expect(OptionalTool.baguette.homepage.absoluteString == "https://github.com/tddworks/baguette")
+    #expect(DeviceToolsViewModel.failure(ShellError(command: "x", exitCode: 1, stderr: "boom")).missingTool == nil)
 }

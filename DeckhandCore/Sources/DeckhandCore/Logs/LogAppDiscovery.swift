@@ -50,7 +50,7 @@ public struct LogAppDiscovery: Sendable {
             return package
         case (.ios, false):
             guard let baguette else {
-                throw LogAppDiscoveryError.unavailable("Finding the foreground app needs Baguette: brew install baguette")
+                throw MissingToolError(.baguette, for: "Finding the foreground app")
             }
             let json = try await runner.run(baguette, ["describe-ui", "--udid", device.id])
             let label = Self.parseRootLabel(json)
