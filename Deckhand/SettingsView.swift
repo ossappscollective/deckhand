@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage(Preferences.terminalAppKey) private var terminalId = "terminal"
     @AppStorage(Preferences.terminalCustomAppKey) private var terminalCustomName = ""
     @AppStorage(Preferences.menuBarIndicatorKey) private var menuBarIndicator = MenuBarIndicator.iconAndCount
+    @AppStorage(Preferences.deviceClickKey) private var deviceClick = DeviceOpenMode.deckhand
     @AppStorage(Preferences.showPhysicalDevicesKey) private var showPhysicalDevices = true
     @AppStorage(Preferences.syncClipboardKey) private var syncClipboard = true
     @AppStorage(Preferences.logBufferKey) private var logBuffer = 50_000
@@ -35,7 +36,10 @@ struct SettingsView: View {
                 Picker("Show running simulators and emulators", selection: $menuBarIndicator) {
                     ForEach(MenuBarIndicator.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
-                Text("The icon gets radio waves while one is running. Right-click the icon for a menu with the window, Settings, About and Quit.")
+                Picker("Clicking a device in the popover opens", selection: $deviceClick) {
+                    ForEach(DeviceOpenMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                Text("A stopped device is started the same way: without a window of its own for Deckhand, with it for the other. A double-click does the other one. The icon gets radio waves while a device is running; right-click it for a menu with the window, Settings, About and Quit.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

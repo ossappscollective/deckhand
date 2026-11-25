@@ -13,6 +13,7 @@ nonisolated enum Preferences {
     static let terminalAppKey = "terminalApp"
     static let terminalCustomAppKey = "terminalCustomApp"
     static let menuBarIndicatorKey = "menuBarIndicator"
+    static let deviceClickKey = "deviceClickOpens"
 
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [showPhysicalDevicesKey: true, syncClipboardKey: true, logBufferKey: 50_000])
@@ -55,6 +56,23 @@ enum MenuBarIndicator: String, CaseIterable {
         case .iconAndCount: "Icon and number"
         case .icon: "Icon only"
         case .never: "Never"
+        }
+    }
+}
+
+/// Where a device opens when you click it in the menu bar popover; a double-click does the other one.
+enum DeviceOpenMode: String, CaseIterable {
+    /// Without a window of its own, in the Deckhand window.
+    case deckhand
+    /// With the Simulator app's or the emulator's own window.
+    case window
+
+    var other: DeviceOpenMode { self == .deckhand ? .window : .deckhand }
+
+    var title: String {
+        switch self {
+        case .deckhand: "The Deckhand window"
+        case .window: "The simulator or emulator window"
         }
     }
 }

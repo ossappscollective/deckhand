@@ -89,90 +89,91 @@ struct MenuBarPanelView: View {
     }
 
     private var header: some View {
-        HStack {
-            Label("Deckhand", systemImage: "iphone")
+        HStack(spacing: 4) {
+            Text("Deckhand")
                 .font(.system(size: 13, weight: .semibold))
             Spacer()
-            Button { openHub(selecting: nil) } label: {
-                Image(systemName: "macwindow").foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Open the Deckhand window")
-            Button {
-                Task { await viewModel.refresh() }
-            } label: {
-                Image(systemName: "arrow.clockwise").foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
+            HeaderButton(symbol: "macwindow", help: "Open the Deckhand window") { openHub(selecting: nil) }
+            HeaderButton(symbol: "arrow.clockwise", help: "Refresh") { Task { await viewModel.refresh() } }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.leading, 16)
+        .padding(.trailing, 10)
+        .padding(.vertical, 8)
     }
 
     private var deviceList: some View {
         ScrollView {
-            VStack(spacing: 14) {
+            VStack(spacing: 12) {
                 DeviceSectionView(
-                    title: "IOS SIMULATORS",
+                    title: "iOS Simulators",
                     devices: viewModel.iosDevices,
                     error: viewModel.iosError,
                     busyDeviceIds: viewModel.busyDeviceIds,
                     rowErrors: viewModel.rowErrors,
                     onAction: performAction,
+                    onOpen: openDevice,
                     onManage: { route = .detail(deviceId: $0.id) },
                     onDelete: deleteDevice,
                     onAdd: { route = .create(.ios) },
                     onCleanUp: cleanUpUnavailableSimulators)
                 DeviceSectionView(
-                    title: "ANDROID EMULATORS",
+                    title: "Android Emulators",
                     devices: viewModel.androidDevices,
                     error: viewModel.androidError,
                     busyDeviceIds: viewModel.busyDeviceIds,
                     rowErrors: viewModel.rowErrors,
                     onAction: performAction,
+                    onOpen: openDevice,
                     onManage: { route = .detail(deviceId: $0.id) },
                     onDelete: deleteDevice,
                     onAdd: { route = .create(.android) })
                 if !viewModel.physicalDevices.isEmpty || viewModel.physicalError != nil {
                     DeviceSectionView(
-                        title: "PHYSICAL DEVICES",
+                        title: "Physical Devices",
                         devices: viewModel.physicalDevices,
                         error: viewModel.physicalError,
                         busyDeviceIds: viewModel.busyDeviceIds,
                         rowErrors: viewModel.rowErrors,
                         onAction: performAction,
+                        onOpen: openDevice,
                         onManage: { route = .detail(deviceId: $0.id) },
                         onDelete: deleteDevice,
                         summary: connectedSummary)
                 }
             }
-            .padding(10)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 10)
         }
     }
 
+    /// Settings and Quit as the rows of a menu, with the keys a menu would show.
     private var footer: some View {
-        HStack {
-            Button {
+        VStack(spacing: 0) {
+            MenuRow(title: "Settings…", symbol: "gearshape", shortcut: "⌘,") {
                 NSApp.activate(ignoringOtherApps: true)
                 openSettings()
-            } label: {
-                Label("Settings", systemImage: "gearshape")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-            Spacer()
-            Button {
+            MenuRow(title: "Quit Deckhand", symbol: "power", shortcut: "⌘Q") {
                 NSApplication.shared.terminate(nil)
-            } label: {
-                Label("Quit", systemImage: "power")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(6)
+    }
+
+    /// What a click (and, the other way round, a double-click) on a device does. A device that is not up is started first:
+    /// without a window of its own when it is to open in Deckhand, with it when it is to open in its own.
+    private func openDevice(_ device: Device, _ mode: DeviceOpenMode) {
+        switch (mode, device.state) {
+        case (.deckhand, .stopped) where !device.isPhysical:
+            Task { await viewModel.perform(.startHeadless, on: device) }
+            openHub(selecting: device.id)
+        case (.window, .stopped) where !device.isPhysical:
+            Task { await viewModel.perform(.start, on: device) }
+        case (.window, .running) where !device.isPhysical:
+            if !DeviceWindows.bringToFront(device) { openHub(selecting: device.id) }
+        default:
+            openHub(selecting: device.id)
+        }
     }
 
     private func performAction(_ action: DeviceAction, on device: Device) {

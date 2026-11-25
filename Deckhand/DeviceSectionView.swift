@@ -8,6 +8,7 @@ struct DeviceSectionView: View {
     let busyDeviceIds: Set<String>
     let rowErrors: [String: String]
     let onAction: (DeviceAction, Device) -> Void
+    let onOpen: (Device, DeviceOpenMode) -> Void
     let onManage: (Device) -> Void
     let onDelete: (Device) -> Void
     var onAdd: (() -> Void)?
@@ -15,26 +16,35 @@ struct DeviceSectionView: View {
     var summary: (([Device]) -> String)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 2) {
             sectionHeader
             if let error {
                 errorLabel(error)
             } else if devices.isEmpty {
                 emptyLabel
             } else {
-                deviceGroup
+                ForEach(devices) { device in
+                    DeviceRowView(
+                        device: device,
+                        isBusy: busyDeviceIds.contains(device.id),
+                        error: rowErrors[device.id],
+                        onAction: { onAction($0, device) },
+                        onOpen: { onOpen(device, $0) },
+                        onManage: { onManage(device) },
+                        onDelete: { onDelete(device) })
+                }
             }
         }
     }
 
     private var sectionHeader: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
-                .kerning(0.5)
+                .font(.system(size: 12, weight: .semibold))
             Spacer()
             Text(runningSummary)
-                .font(.system(size: 11, weight: .medium))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
             if let onAdd {
                 Button(action: onAdd) {
                     Image(systemName: "plus")
@@ -54,7 +64,8 @@ struct DeviceSectionView: View {
             }
         }
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 2)
     }
 
     private var runningSummary: String {
@@ -62,36 +73,17 @@ struct DeviceSectionView: View {
         return "\(devices.count(where: { $0.state == .running })) of \(devices.count) running"
     }
 
-    private var deviceGroup: some View {
-        VStack(spacing: 0) {
-            ForEach(devices) { device in
-                if device.id != devices.first?.id {
-                    Divider()
-                }
-                DeviceRowView(
-                    device: device,
-                    isBusy: busyDeviceIds.contains(device.id),
-                    error: rowErrors[device.id],
-                    onAction: { onAction($0, device) },
-                    onManage: { onManage(device) },
-                    onDelete: { onDelete(device) })
-            }
-        }
-        .background(.background, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator, lineWidth: 1))
-    }
-
     private func errorLabel(_ message: String) -> some View {
         Label(message, systemImage: "exclamationmark.triangle")
             .font(.system(size: 11))
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 8)
     }
 
     private var emptyLabel: some View {
         Text("No devices found")
             .font(.system(size: 11))
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 8)
     }
 }

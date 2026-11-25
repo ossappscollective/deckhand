@@ -7,6 +7,8 @@ import DeckhandCore
 final class TrayMenu {
     struct Actions {
         var devices: () -> [Device]
+        var stoppedDevices: () -> [Device]
+        var startInDeckhand: (Device) -> Void
         var openHub: (_ deviceId: String?) -> Void
         var refresh: () -> Void
         var openSettings: () -> Void
@@ -56,12 +58,38 @@ final class TrayMenu {
             }
         }
 
+        let stopped = actions.stoppedDevices()
+        if !stopped.isEmpty {
+            let start = NSMenuItem(title: "Start in Deckhand", action: nil, keyEquivalent: "")
+            start.image = NSImage(systemSymbolName: "play.fill", accessibilityDescription: nil)
+            start.submenu = startMenu(stopped)
+            menu.addItem(.separator())
+            menu.addItem(start)
+        }
+
         menu.addItem(.separator())
         menu.addItem(item("Refresh Devices", symbol: "arrow.clockwise") { [actions] in actions.refresh() })
         menu.addItem(item("Settings…", symbol: "gearshape", key: ",") { [actions] in actions.openSettings() })
         menu.addItem(.separator())
         menu.addItem(item("About Deckhand", symbol: "info.circle") { Self.showAbout() })
         menu.addItem(item("Quit Deckhand", symbol: "power", key: "q") { NSApplication.shared.terminate(nil) })
+        return menu
+    }
+
+    /// Boots a device without a window of its own and opens the Deckhand window on it.
+    private func startMenu(_ devices: [Device]) -> NSMenu {
+        let menu = NSMenu()
+        for (title, platform) in [("iOS Simulators", Platform.ios), ("Android Emulators", Platform.android)] {
+            let group = devices.filter { $0.platform == platform }
+            guard !group.isEmpty else { continue }
+            if menu.items.count > 0 { menu.addItem(.separator()) }
+            menu.addItem(header(title))
+            for device in group {
+                menu.addItem(item("\(device.name) · \(device.osVersion)", symbol: platform == .ios ? "iphone.gen3" : "smartphone") { [actions] in
+                    actions.startInDeckhand(device)
+                })
+            }
+        }
         return menu
     }
 

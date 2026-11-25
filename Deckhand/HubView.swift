@@ -152,8 +152,8 @@ struct HubView: View {
             if device.state == .running {
                 Button("Stop") { Task { await list.perform(.stop, on: device) } }
             } else if device.state == .stopped {
-                Button("Start") { Task { await list.perform(.start, on: device) } }
-                Button("Start Headless") { Task { await list.perform(.startHeadless, on: device) } }
+                Button("Start") { Task { await list.perform(.startHeadless, on: device) } }
+                Button("Start with \(device.platform == .ios ? "Simulator" : "Emulator") Window") { Task { await list.perform(.start, on: device) } }
                 if device.platform == .android {
                     Button("Start without/with Sound") { Task { await list.perform(.startWithAlternateAudio, on: device) } }
                 }
@@ -378,7 +378,8 @@ struct HubView: View {
             Spacer()
             if !device.isPhysical, device.state == .running || device.state == .stopped {
                 Button(device.state == .running ? "Stop" : "Start") {
-                    Task { await list.perform(device.state == .running ? .stop : .start, on: device) }
+                    // the mirror in this window is the screen, so the device needs no window of its own
+                    Task { await list.perform(device.state == .running ? .stop : .startHeadless, on: device) }
                 }
                 .controlSize(.small)
                 .disabled(list.busyDeviceIds.contains(device.id))
@@ -479,17 +480,20 @@ private struct MirrorPane: View {
                 VStack(spacing: 10) {
                     Text("Start the device to mirror it").foregroundStyle(.white.opacity(0.6))
                     HStack(spacing: 8) {
-                        Button { Task { await list.perform(.start, on: device) } } label: {
+                        Button { Task { await list.perform(.startHeadless, on: device) } } label: {
                             Label("Start", systemImage: "play.fill")
                         }
                         .buttonStyle(.borderedProminent)
-                        Button { Task { await list.perform(.startHeadless, on: device) } } label: {
-                            Label("Start Headless", systemImage: "rectangle.dashed")
-                        }
-                        .buttonStyle(.bordered)
                         .help(device.platform == .ios
                               ? "Boots the simulator without opening the Simulator app: this mirror is its only screen"
                               : "Starts the emulator without its own window: this mirror is its only screen")
+                        Button { Task { await list.perform(.start, on: device) } } label: {
+                            Label("Start with Window", systemImage: "macwindow")
+                        }
+                        .buttonStyle(.bordered)
+                        .help(device.platform == .ios
+                              ? "Opens the Simulator app as well"
+                              : "Starts the emulator with its own window as well")
                     }
                     .controlSize(.small).disabled(device.state == .unavailable)
                 }

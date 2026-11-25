@@ -71,8 +71,8 @@ struct DeviceCommands: Commands {
             item("Screenshot", .screenshot, "s", .command)
             item(actions?.isRecording == true ? "Stop Recording" : "Start Recording", .toggleRecording, "r", [.command, .option])
             Divider()
-            item("Start", .start)
-            item("Start Headless", .startHeadless)
+            item("Start", .startHeadless)
+            item("Start with Window", .start)
             item("Stop", .stop)
         }
         CommandMenu("Panels") {

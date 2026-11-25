@@ -120,6 +120,12 @@ struct MenuBarLabel: View {
     private func installTrayMenu() {
         let actions = TrayMenu.Actions(
             devices: { list.runningDevices },
+            stoppedDevices: { (list.iosDevices + list.androidDevices).filter { $0.state == .stopped } },
+            startInDeckhand: { device in
+                Task { await list.perform(.startHeadless, on: device) }
+                router.selection = device.id
+                showWindow()
+            },
             openHub: { deviceId in
                 if let deviceId { router.selection = deviceId }
                 showWindow()

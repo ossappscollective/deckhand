@@ -1,29 +1,34 @@
 import SwiftUI
 import DeckhandCore
 
+/// One device in the popover, laid out like the rows of the system's own Wi-Fi and Bluetooth menus: an icon, two lines and
+/// controls that appear under the pointer. A click opens it, a double-click opens it the other way (see `DeviceOpenMode`).
 struct DeviceRowView: View {
     @Environment(DeviceToolsViewModel.self) private var toolsModel
     @AppStorage(Preferences.muteAudioKey) private var muteAudio = false
+    @AppStorage(Preferences.deviceClickKey) private var click = DeviceOpenMode.deckhand
 
     let device: Device
     let isBusy: Bool
     let error: String?
     let onAction: (DeviceAction) -> Void
+    let onOpen: (DeviceOpenMode) -> Void
     let onManage: () -> Void
     let onDelete: () -> Void
     @State private var confirmingDelete = false
+    @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 9) {
-                Circle().fill(stateColor).frame(width: 8, height: 8)
+            HStack(spacing: 10) {
+                icon
                 deviceInfo
                 Spacer(minLength: 8)
                 trailing
             }
             if confirmingDelete {
                 HStack(spacing: 8) {
-                    Text("Delete \(device.name)?").font(.system(size: 11))
+                    Text("Delete \(device.name)?").font(.callout)
                     Spacer()
                     Button("Cancel") { confirmingDelete = false }
                     Button("Delete", role: .destructive) {
@@ -35,21 +40,59 @@ struct DeviceRowView: View {
             }
             if let error {
                 Text(error)
-                    .font(.system(size: 11))
+                    .font(.caption)
                     .foregroundStyle(.red)
                     .lineLimit(2)
             }
         }
-        .padding(.vertical, 9)
-        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .background(hovering ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contentShape(Rectangle())
-        .onTapGesture(perform: onManage)
+        .onHover { hovering = $0 }
+        .onTapGesture(count: 2) { onOpen(click.other) }
+        .onTapGesture { onOpen(click) }
+        .help(helpText)
+    }
+
+    private var helpText: String {
+        "Click: \(click == .deckhand ? "Deckhand window" : "own window"). Double-click: \(click == .deckhand ? "own window" : "Deckhand window")"
+    }
+
+    /// A round badge like Control Center's: filled while the device is up.
+    private var icon: some View {
+        ZStack {
+            Circle().fill(badgeFill)
+            if device.state == .booting {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(device.state == .running ? Color.white : Color.secondary)
+            }
+        }
+        .frame(width: 30, height: 30)
+    }
+
+    private var symbol: String {
+        let name = device.name.lowercased()
+        if device.platform == .ios { return name.contains("ipad") ? "ipad" : "iphone.gen3" }
+        return name.contains("tablet") ? "ipad.landscape" : "smartphone"
+    }
+
+    private var badgeFill: Color {
+        switch device.state {
+        case .running: Color.green
+        case .booting: Color.orange.opacity(0.25)
+        case .stopped: Color.primary.opacity(0.10)
+        case .unavailable: Color.red.opacity(0.25)
+        }
     }
 
     private var deviceInfo: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(device.name).font(.system(size: 13, weight: .medium))
-            Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 1) {
+            Text(device.name).font(.system(size: 13, weight: .medium)).lineLimit(1)
+            Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
     }
 
@@ -66,22 +109,17 @@ struct DeviceRowView: View {
         }
     }
 
-    private var stateColor: Color {
-        switch device.state {
-        case .running: .green
-        case .booting: .orange
-        case .stopped: Color(nsColor: .tertiaryLabelColor)
-        case .unavailable: .red
-        }
-    }
-
     @ViewBuilder
     private var trailing: some View {
         if isBusy {
             ProgressView().controlSize(.small)
         } else {
-            if !device.isPhysical { primaryActionButton }
-            actionMenu
+            HStack(spacing: 2) {
+                if !device.isPhysical { primaryActionButton }
+                actionMenu
+            }
+            // under the pointer, or when the keyboard is on them; the space stays, so the rows do not shift
+            .opacity(hovering ? 1 : 0)
         }
     }
 
@@ -90,17 +128,22 @@ struct DeviceRowView: View {
             onAction(device.state == .running ? .stop : .start)
         } label: {
             Image(systemName: device.state == .running ? "stop.fill" : "play.fill")
-                .foregroundStyle(device.state == .booting ? Color.secondary : (device.state == .running ? Color.red : Color.blue))
+                .font(.system(size: 11))
+                .frame(width: 24, height: 24)
+                .background(Color.primary.opacity(0.08), in: Circle())
         }
         .buttonStyle(.plain)
-        .frame(width: 24, height: 24)
+        .foregroundStyle(device.state == .running ? Color.red : Color.primary)
         .disabled(device.state == .booting)
+        .help(device.state == .running ? "Stop" : "Start with its own window")
     }
 
     private var actionMenu: some View {
         Menu {
             if !device.isPhysical && device.state == .stopped {
-                Button("Start Headless") { onAction(.startHeadless) }
+                Button("Start in Deckhand") { onOpen(.deckhand) }
+                Button("Start in Background") { onAction(.startHeadless) }
+                Button("Start with \(device.platform == .ios ? "Simulator" : "Emulator") Window") { onAction(.start) }
             }
             if !device.isPhysical && device.platform == .android && device.state == .stopped {
                 Button(muteAudio ? "Start with Sound" : "Start without Sound") {
@@ -139,11 +182,14 @@ struct DeviceRowView: View {
                     .disabled(device.state != .stopped)
             }
         } label: {
-            Image(systemName: "ellipsis").foregroundStyle(.secondary)
+            Image(systemName: "ellipsis")
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 24, height: 24)
+                .background(Color.primary.opacity(0.08), in: Circle())
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .frame(width: 24, height: 24)
+        .fixedSize()
     }
 
     private func runTool(_ tool: DeviceTool) {
