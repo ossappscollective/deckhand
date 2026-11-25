@@ -441,3 +441,21 @@ private func bundleTools(_ runner: MockShellRunner, bundletool: String? = "/bt/b
     #expect(OptionalTool.baguette.homepage.absoluteString == "https://github.com/tddworks/baguette")
     #expect(DeviceToolsViewModel.failure(ShellError(command: "x", exitCode: 1, stderr: "boom")).missingTool == nil)
 }
+
+@MainActor
+@Test func aCornerScreenshotIsHandedOverInsteadOfRevealed() async {
+    let runner = MockShellRunner()
+    let tools = makeToolsModel(runner)
+    var captured: [String] = []
+    tools.onScreenshotCaptured = { captured.append($0) }
+
+    await tools.screenshotToCorner(sim)
+    #expect(captured.count == 1)
+    #expect(captured.first?.hasSuffix(".png") == true)
+    #expect(!runner.commands.contains { $0.hasPrefix("/usr/bin/open -R") })
+
+    // the next plain screenshot is revealed as before
+    await tools.perform(.screenshot, on: sim)
+    #expect(captured.count == 1)
+    #expect(runner.commands.contains { $0.hasPrefix("/usr/bin/open -R") })
+}

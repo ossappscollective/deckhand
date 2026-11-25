@@ -4,7 +4,7 @@ import SwiftUI
 /// What the Device menu can do to the device the window shows.
 enum HubCommand {
     case home, appSwitcher, back, lock, volumeUp, volumeDown
-    case screenshot, toggleRecording
+    case screenshot, screenshotToCorner, toggleRecording
     case rotateLeft, rotateRight
     case toggleDarkMode, largerText, smallerText
     case start, startHeadless, stop
@@ -25,7 +25,7 @@ struct HubActions {
         switch command {
         case .home, .appSwitcher, .lock, .volumeUp, .volumeDown: return mirrors
         case .back: return mirrors && device.platform == .android
-        case .screenshot: return running && DeviceTool.screenshot.isSupported(for: device)
+        case .screenshot, .screenshotToCorner: return running && DeviceTool.screenshot.isSupported(for: device)
         case .toggleRecording: return running && DeviceTool.startRecording.isSupported(for: device)
         case .rotateLeft, .rotateRight: return running && DeviceTool.rotate.isSupported(for: device)
         case .toggleDarkMode: return running && DeviceTool.toggleAppearance.isSupported(for: device)
@@ -69,6 +69,7 @@ struct DeviceCommands: Commands {
             item("Smaller Text", .smallerText, "-", [.command, .option])
             Divider()
             item("Screenshot", .screenshot, "s", .command)
+            item("Screenshot with Thumbnail", .screenshotToCorner, "s", .control)
             item(actions?.isRecording == true ? "Stop Recording" : "Start Recording", .toggleRecording, "r", [.command, .option])
             Divider()
             item("Start", .startHeadless)

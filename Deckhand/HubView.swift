@@ -89,6 +89,7 @@ struct HubView: View {
         .onChange(of: router.selection) { _, _ in creating = nil }
         .onAppear {
             tools.didRotate = { mirror.rotated($0, clockwise: $1) }
+            tools.onScreenshotCaptured = { ScreenshotThumbnail.shared.show(path: $0) }
             mirror.orientationProvider = { tools.orientation(of: $0) }
         }
         .onChange(of: list.iosDevices + list.androidDevices + list.physicalDevices) { _, devices in
@@ -308,6 +309,7 @@ struct HubView: View {
         case .volumeUp: if ios { mirror.press(SimulatorInputSession.Button.volumeUp) } else { mirror.press(AndroidInput.Key.volumeUp) }
         case .volumeDown: if ios { mirror.press(SimulatorInputSession.Button.volumeDown) } else { mirror.press(AndroidInput.Key.volumeDown) }
         case .screenshot: run(.screenshot)
+        case .screenshotToCorner: Task { await tools.screenshotToCorner(device) }
         case .toggleRecording: run(tools.isRecording(device) ? .stopRecording : .startRecording)
         case .rotateLeft: run(.rotateLeft)
         case .rotateRight: run(.rotate)

@@ -30,6 +30,9 @@ public final class DeviceToolsViewModel {
     public private(set) var message: Message?
     /// Called after a device was rotated, so a mirror that does not follow the rotation by itself can restart.
     public var didRotate: ((Device, _ clockwise: Bool) -> Void)?
+    /// Called with the file of a screenshot taken by `screenshotToCorner`, in place of showing it in the Finder.
+    public var onScreenshotCaptured: ((String) -> Void)?
+    private var screenshotToCorner = false
     private var orientations: [String: SimulatorOrientation] = [:]
 
     /// How a simulator is held, as far as Deckhand knows: it cannot be asked.
@@ -244,8 +247,20 @@ public final class DeviceToolsViewModel {
         }
     }
 
+    /// A screenshot that is handed to `onScreenshotCaptured` (a thumbnail in the corner to drag from) instead of being
+    /// revealed in the Finder.
+    public func screenshotToCorner(_ device: Device) async {
+        screenshotToCorner = true
+        await perform(.screenshot, on: device)
+        screenshotToCorner = false
+    }
+
     private func finishCapture(_ path: String) async throws -> String {
-        try await reveal(path)
+        if screenshotToCorner, let onScreenshotCaptured {
+            onScreenshotCaptured(path)
+        } else {
+            try await reveal(path)
+        }
         return "Saved \((path as NSString).lastPathComponent)"
     }
 
