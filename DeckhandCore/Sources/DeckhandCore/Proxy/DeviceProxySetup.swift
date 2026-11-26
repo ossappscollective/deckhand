@@ -51,7 +51,7 @@ public struct DeviceProxySetup: Sendable {
     private let helperAPK: String?
     public static let helperPackage = "com.deckhand.helper"
     /// `versionCode` of the bundled helper: a device with an older one gets the new build.
-    public static let helperVersion = 2
+    public static let helperVersion = 3
 
     public init(runner: any ShellRunner = ProcessShellRunner(), sdk: AndroidSDK?, authority: CertificateAuthority,
                 helperAPK: String? = nil,
