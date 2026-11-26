@@ -37,14 +37,29 @@ struct HubView: View {
             .frame(minHeight: 360)
     }
 
+    // The modifiers are applied in a few steps: one chain this long is more than the compiler can type-check in time.
     private func content(router selection: Binding<String?>) -> some View {
+        presenting(observing(split(router: selection)))
+    }
+
+    private func split(router selection: Binding<String?>) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar(selection: selection)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
         } detail: {
             detail
         }
-        .toolbar {
+        .toolbar { toolbarItems }
+        .task {
+            while !Task.isCancelled {
+                await list.refresh()
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarItems: some ToolbarContent {
             ToolbarItem {
                 Menu {
                     Button("New iOS Simulator…") { creating = .ios }
@@ -83,13 +98,10 @@ struct HubView: View {
                 .toggleStyle(.button)
                 .help("Show or hide the tools panel.")
             }
-        }
-        .task {
-            while !Task.isCancelled {
-                await list.refresh()
-                try? await Task.sleep(for: .seconds(5))
-            }
-        }
+    }
+
+    private func observing(_ view: some View) -> some View {
+        view
         .focusedSceneValue(\.hubActions, HubActions(device: selected, isRecording: selected.map { tools.isRecording($0) } ?? false,
                                                    perform: { perform($0) }))
         .onChange(of: router.selection) { _, _ in creating = nil }
@@ -119,7 +131,11 @@ struct HubView: View {
         }
         .onChange(of: logBuffer, initial: true) { _, lines in logs.capacity = lines }
         .onChange(of: networkPort, initial: true) { _, port in network.preferredPort = port > 0 ? port : nil }
-                // the app is a menu bar agent; while this window is open it also gets a Dock icon
+    }
+
+    private func presenting(_ view: some View) -> some View {
+        view
+        // the app is a menu bar agent; while this window is open it also gets a Dock icon
         .onAppear {
             AppActivation.bringToFront()
         }
