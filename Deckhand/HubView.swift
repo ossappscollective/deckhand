@@ -285,9 +285,9 @@ struct HubView: View {
             }
             .overlay(alignment: .bottom) { toast(showsAlways: !(showInspector || !showMirror)) }
             .overlay(alignment: .topTrailing) {
-                if tools.isWorking {
-                    ProgressView().controlSize(.small).padding(8)
-                        .background(.regularMaterial, in: Capsule()).padding(10)
+                // over the mirror the activity has a card of its own
+                if tools.isWorking, !(showMirror && tools.activity?.deviceId == device.id) {
+                    ActivityPill(activity: tools.activity)
                 }
             }
             .overlay {
@@ -454,7 +454,7 @@ struct HubView: View {
     /// What the tools column needs: its cards fit in 340, but the logs and network tables need room for their columns.
     private var inspectorMin: CGFloat { logMode != .hidden && (showInspector || !showMirror) ? 640 : 340 }
     /// Height of the button strip under the picture; it is part of the column but not of the picture.
-    static let barHeight: CGFloat = 36
+    static let barHeight: CGFloat = 46
 
     /// The mirror takes what the tools column leaves; the column is a share of the window that never gets narrower
     /// than its content needs.
@@ -587,59 +587,106 @@ private struct MirrorPane: View {
         .onDisappear { controller.stop() }
     }
 
+    /// What stands over the picture: a dimmed layer so that text and buttons read on any frame, the state of the mirror
+    /// in the middle, and what Deckhand is doing to the device (an install, a copy) on top of that.
     @ViewBuilder
     private var overlay: some View {
+        ZStack {
+            state
+            if let activity = tools.activity, activity.deviceId == device.id { ActivityCard(activity: activity) }
+        }
+        .animation(.easeOut(duration: 0.2), value: tools.activity)
+    }
+
+    /// What is being done to the device that takes the picture away: the mirror ends or restarts with it.
+    private var ending: String? {
+        switch list.busyAction(for: device) {
+        case .stop: "Stopping \(device.name)…"
+        case .coldBoot: "Restarting \(device.name)…"
+        case .erase: device.platform == .ios ? "Erasing \(device.name)…" : "Wiping \(device.name)…"
+        default: nil
+        }
+    }
+
+    @ViewBuilder
+    private var state: some View {
+        if let ending {
+            scrim {
+                ProgressView().controlSize(.large)
+                Text(ending).font(.title3).multilineTextAlignment(.center)
+            }
+        } else {
+            mirrorState
+        }
+    }
+
+    @ViewBuilder
+    private var mirrorState: some View {
         switch controller.state {
         case .idle:
             if device.state == .running {
                 EmptyView()
             } else if device.state == .booting || list.busyDeviceIds.contains(device.id) {
-                VStack(spacing: 8) {
-                    ProgressView().controlSize(.small).tint(.white)
-                    Text("Starting \(device.name)…").foregroundStyle(.white.opacity(0.6))
+                scrim {
+                    ProgressView().controlSize(.large)
+                    Text("Starting \(device.name)…").font(.title3)
                 }
             } else if device.isPhysical {
-                Text("Connect and unlock the device to mirror it").foregroundStyle(.white.opacity(0.6))
+                scrim { Text("Connect and unlock the device to mirror it").font(.title3).multilineTextAlignment(.center) }
             } else {
-                VStack(spacing: 10) {
-                    Text("Start the device to mirror it").foregroundStyle(.white.opacity(0.6))
-                    HStack(spacing: 8) {
+                scrim {
+                    Text("Start the device to mirror it").font(.title3).multilineTextAlignment(.center)
+                    VStack(spacing: 10) {
                         Button { Task { await list.perform(.startHeadless, on: device) } } label: {
-                            Label("Start", systemImage: "play.fill")
+                            Label("Start", systemImage: "play.fill").frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
                         .help(device.platform == .ios
                               ? "Boots the simulator without opening the Simulator app: this mirror is its only screen"
                               : "Starts the emulator without its own window: this mirror is its only screen")
                         Button { Task { await list.perform(.start, on: device) } } label: {
-                            Label("Start with Window", systemImage: "macwindow")
+                            Label("Start with Window", systemImage: "macwindow").frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
                         .help(device.platform == .ios
                               ? "Opens the Simulator app as well"
                               : "Starts the emulator with its own window as well")
                     }
-                    .controlSize(.small).disabled(device.state == .unavailable)
+                    .controlSize(.large)
+                    .frame(width: 220)
+                    .disabled(device.state == .unavailable)
                 }
             }
         case .starting:
-            ProgressView().controlSize(.small).tint(.white)
+            scrim { ProgressView().controlSize(.large) }
         case .live:
             EmptyView()
         case .failed(let message):
-            VStack(spacing: 8) {
-                Text(message).multilineTextAlignment(.center).foregroundStyle(.white.opacity(0.8))
-                Button("Retry") { controller.start(device) }.controlSize(.small)
+            scrim {
+                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 28)).foregroundStyle(.yellow)
+                Text(message).multilineTextAlignment(.center).foregroundStyle(.secondary)
+                Button { controller.start(device) } label: {
+                    Label("Retry", systemImage: "arrow.clockwise").frame(minWidth: 120)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
             }
-            .padding()
         }
+    }
+
+    private func scrim<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(spacing: 14) { content() }
+            .padding(24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.black.opacity(0.6))
+            .environment(\.colorScheme, .dark)
     }
 
     /// The strip under the picture: navigation, power and rotation stay; what is only occasionally needed is in the menu.
     private var buttonBar: some View {
         ViewThatFits(in: .horizontal) {
-            buttons(volume: true)
-            buttons(volume: false)
+            buttons(volume: true, compact: false)
+            buttons(volume: false, compact: false)
+            buttons(volume: false, compact: true)
         }
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
@@ -649,14 +696,14 @@ private struct MirrorPane: View {
         .disabled(controller.state != .live && device.platform == .android)
     }
 
-    private func buttons(volume: Bool) -> some View {
-        HStack(spacing: 14) {
+    private func buttons(volume: Bool, compact: Bool) -> some View {
+        HStack(spacing: 4) {
             if device.platform == .android {
                 key(.back, "chevron.left", "Back")
                 key(.home, "circle", "Home")
                 key(.appSwitch, "square", "Overview")
                 if volume {
-                    Divider().frame(height: 16)
+                    Divider().frame(height: 20)
                     key(.volumeDown, "speaker.wave.1", "Volume down")
                     key(.volumeUp, "speaker.wave.3", "Volume up")
                 }
@@ -666,7 +713,7 @@ private struct MirrorPane: View {
                 simulatorKey(.appSwitcher, "square.on.square", "App Switcher")
                 simulatorKey(.lock, "power", "Lock")
                 if volume {
-                    Divider().frame(height: 16)
+                    Divider().frame(height: 20)
                     simulatorKey(.volumeDown, "speaker.wave.1", "Volume down")
                     simulatorKey(.volumeUp, "speaker.wave.3", "Volume up")
                 }
@@ -676,21 +723,28 @@ private struct MirrorPane: View {
             } else if let notice = controller.inputNotice, volume {
                 Text(notice).font(.system(size: 11))
             }
-            Divider().frame(height: 16)
-            if DeviceTool.rotate.isSupported(for: device) {
-                Button { Task { await tools.perform(.rotate, on: device) } } label: { Image(systemName: "rotate.right") }
-                    .help("Rotate")
+            Divider().frame(height: 20)
+            if !compact {
+                if DeviceTool.rotate.isSupported(for: device) {
+                    BarKey(symbol: "rotate.right", help: "Rotate") { Task { await tools.perform(.rotate, on: device) } }
+                }
+                BarKey(symbol: "camera", help: "Screenshot") { Task { await tools.perform(.screenshot, on: device) } }
             }
-            Button { Task { await tools.perform(.screenshot, on: device) } } label: { Image(systemName: "camera") }
-                .help("Screenshot")
-            moreMenu
+            moreMenu(compact: compact)
         }
         .fixedSize()
     }
 
     /// What is not needed all the time: which engine draws the picture, the device's own window, a recording.
-    private var moreMenu: some View {
+    private func moreMenu(compact: Bool) -> some View {
         Menu {
+            if compact {
+                if DeviceTool.rotate.isSupported(for: device) {
+                    Button("Rotate") { Task { await tools.perform(.rotate, on: device) } }
+                }
+                Button("Screenshot") { Task { await tools.perform(.screenshot, on: device) } }
+                Divider()
+            }
             if let engine = controller.engine {
                 Text("Mirror engine: \(engine)")
             }
@@ -720,7 +774,7 @@ private struct MirrorPane: View {
                 }
             }
         } label: {
-            Image(systemName: "ellipsis")
+            Image(systemName: "ellipsis").font(.system(size: BarKey.symbolSize, weight: .medium)).frame(width: BarKey.width, height: BarKey.height)
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
         .help("More")
@@ -728,7 +782,7 @@ private struct MirrorPane: View {
     }
 
     private func simulatorKey(_ button: SimulatorInputSession.Button, _ symbol: String, _ help: String) -> some View {
-        Button { controller.press(button) } label: { Image(systemName: symbol) }.help(help)
+        BarKey(symbol: symbol, help: help) { controller.press(button) }
     }
 
     private func openSimulatorApp() {
@@ -741,7 +795,7 @@ private struct MirrorPane: View {
     }
 
     private func key(_ key: AndroidInput.Key, _ symbol: String, _ help: String) -> some View {
-        Button { controller.press(key) } label: { Image(systemName: symbol) }.help(help)
+        BarKey(symbol: symbol, help: help) { controller.press(key) }
     }
 }
 

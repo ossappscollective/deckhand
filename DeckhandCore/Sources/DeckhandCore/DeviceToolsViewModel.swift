@@ -27,6 +27,15 @@ public final class DeviceToolsViewModel {
     public private(set) var appsState: AppsState = .idle
     public private(set) var appsError: String?
     public private(set) var isWorking = false
+    /// What a long action is doing and on which device, for a progress shown over the device.
+    public struct Activity: Equatable, Sendable {
+        public var deviceId: String
+        public var title: String
+        public var detail: String?
+        /// Finished share of several steps; nil when there is only one and its length is not known.
+        public var fraction: Double?
+    }
+    public private(set) var activity: Activity?
     public private(set) var message: Message?
     /// Called after a device was rotated, so a mirror that does not follow the rotation by itself can restart.
     public var didRotate: ((Device, _ clockwise: Bool) -> Void)?
@@ -96,6 +105,8 @@ public final class DeviceToolsViewModel {
         }
         isWorking = true
         message = nil
+        activity = tool.activityTitle.map { Activity(deviceId: device.id, title: $0, detail: device.name, fraction: nil) }
+        defer { activity = nil }
         do {
             message = try await run(tool, on: device).map { Message(text: $0, isError: false) }
             if shouldReloadApps(after: tool) { await loadApps(for: device) }
@@ -112,7 +123,8 @@ public final class DeviceToolsViewModel {
         message = nil
         var done = 0
         var failures: [String] = []
-        for path in paths {
+        defer { activity = nil }
+        for (index, path) in paths.enumerated() {
             let name = (path as NSString).lastPathComponent
             let tool: DeviceTool
             switch FileDrop.action(for: path, on: device) {
@@ -124,6 +136,10 @@ public final class DeviceToolsViewModel {
                 failures.append("\(name): \(reason)")
                 continue
             }
+            let several = paths.count > 1
+            activity = Activity(deviceId: device.id, title: tool.activityTitle ?? "Copying \(name)",
+                                detail: several ? "\(device.name) · file \(index + 1) of \(paths.count)" : device.name,
+                                fraction: several ? Double(index) / Double(paths.count) : nil)
             do {
                 _ = try await run(tool, on: device)
                 done += 1

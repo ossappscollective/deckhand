@@ -476,3 +476,12 @@ private func bundleTools(_ runner: MockShellRunner, bundletool: String? = "/bt/b
     #expect(!FileManager.default.fileExists(atPath: old.path))
     #expect(FileManager.default.fileExists(atPath: fresh.path))
 }
+
+
+@Test func longActionsNameWhatTheyDo() {
+    #expect(DeviceTool.install("/tmp/Build/app.apk").activityTitle == "Installing app.apk")
+    #expect(DeviceTool.install("https://example.com/builds/app.tar.gz").activityTitle == "Installing app.tar.gz")
+    #expect(DeviceTool.pushFile("/tmp/report.pdf").activityTitle == "Copying report.pdf")
+    #expect(DeviceTool.addMedia("/tmp/photo.png").activityTitle == "Adding photo.png")
+    #expect(DeviceTool.screenshot.activityTitle == nil)
+}

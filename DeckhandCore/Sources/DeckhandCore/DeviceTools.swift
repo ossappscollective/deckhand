@@ -52,6 +52,20 @@ public enum DeviceTool: Sendable, Equatable {
     case clearData(app: String)
     case revealAppData(app: String)
 
+    /// What a progress over the device says while this runs; nil for what is over at once.
+    public var activityTitle: String? {
+        func name(_ source: String) -> String {
+            URL(string: source).flatMap { $0.scheme?.hasPrefix("http") == true ? $0.lastPathComponent : nil }
+                ?? (source as NSString).lastPathComponent
+        }
+        switch self {
+        case .install(let source): return "Installing \(name(source))"
+        case .pushFile(let path), .copyToFiles(let path): return "Copying \(name(path))"
+        case .addMedia(let path): return "Adding \(name(path))"
+        default: return nil
+        }
+    }
+
     /// Physical devices lack the emulator console and most simulator-only switches.
     public func isSupported(for device: Device) -> Bool {
         guard device.isPhysical else { return isSupported(on: device.platform) }

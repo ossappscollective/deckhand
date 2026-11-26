@@ -11,6 +11,10 @@ public final class DeviceListViewModel {
     public private(set) var physicalDevices: [Device] = []
     public private(set) var physicalError: String?
     public private(set) var busyDeviceIds: Set<String> = []
+    private var busyActions: [String: DeviceAction] = [:]
+
+    /// What is being done to `device` now, for a progress over its screen.
+    public func busyAction(for device: Device) -> DeviceAction? { busyActions[device.id] }
     public private(set) var rowErrors: [String: String] = [:]
 
     /// Simulators and emulators that are up. Attached phones are always "running", so they do not count.
@@ -75,6 +79,7 @@ public final class DeviceListViewModel {
 
     public func perform(_ action: DeviceAction, on device: Device) async {
         busyDeviceIds.insert(device.id)
+        busyActions[device.id] = action
         rowErrors[device.id] = nil
         do {
             try await execute(action, on: device)
@@ -86,8 +91,10 @@ public final class DeviceListViewModel {
         } catch {
             rowErrors[device.id] = friendlyMessage(error)
         }
-        busyDeviceIds.remove(device.id)
+        // the list is up to date before the device stops being busy, so a stopped device is not shown as running for a moment
         await refresh()
+        busyDeviceIds.remove(device.id)
+        busyActions[device.id] = nil
     }
 
     private func loadPhysical() async -> ([Device], String?) {
