@@ -6,6 +6,9 @@ All notable changes to Deckhand are documented here.
 
 ### Added
 
+- Slowing down a simulator or a phone starts capturing it by itself (it goes through Deckhand's proxy) and says so; setting it back to No Limit ends that capturing again, unless you started it yourself. Stopping the capture ends the slowdown. Android emulators are slowed by the emulator and need no capturing
+- Network capture belongs to each device: switching device in the Network panel shows that device's own state (Capture or Stop), and a device you switched away from keeps capturing. The proxy runs while any device captures and stops with the last one; a device that stops ends only its own capture. A simulator that is not being captured is not recorded
+- A red record button in the sidebar marks every device that is capturing; clicking it stops that device's capture
 - The menu bar popover closes by itself when it opens the Deckhand window, a device or Settings, when it starts a device, and when you switch to another app (Command-Tab)
 - Showing or hiding the sidebar, the mirror, the tools column or the log panel gives the window the width at which the picture keeps its size, so no black bars appear beside it (the height and the top-left corner stay)
 - The window grows and shrinks together with the panels (the sidebar, the mirror, the tools column, the logs and network panels slide in and out) instead of after them

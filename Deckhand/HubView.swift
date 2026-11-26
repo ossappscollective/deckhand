@@ -511,6 +511,7 @@ private struct PendingInstall: Identifiable {
 }
 
 private struct SidebarRow: View {
+    @Environment(NetworkViewModel.self) private var network
     let device: Device
     let isBusy: Bool
 
@@ -521,10 +522,15 @@ private struct SidebarRow: View {
                 Text(device.name).lineLimit(1)
                 Text(device.osVersion).font(.system(size: 10)).foregroundStyle(.secondary)
             }
-            if isBusy {
-                Spacer()
-                ProgressView().controlSize(.small)
+            if isBusy || network.isCapturing(device) { Spacer(minLength: 4) }
+            if network.isCapturing(device) {
+                Button { Task { await network.stopCapture(device) } } label: {
+                    Image(systemName: "record.circle.fill").foregroundStyle(.red).font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .help("Capturing network traffic. Click to stop.")
             }
+            if isBusy { ProgressView().controlSize(.small) }
         }
     }
 

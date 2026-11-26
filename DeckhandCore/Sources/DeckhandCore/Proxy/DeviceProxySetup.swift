@@ -265,17 +265,19 @@ public struct DeviceProxySetup: Sendable {
     }
 
     /// Capturing started: the helpers can reach the proxy again, and connect their VPN by themselves.
-    public func attachHelpers(port: Int) async {
+    /// Only the one on `serial` when it is given.
+    public func attachHelpers(port: Int, serial only: String? = nil) async {
         guard let sdk else { return }
-        for serial in await helperDevices() {
+        for serial in await helperDevices() where only == nil || only == serial {
             _ = try? await runner.run(sdk.adbPath, ["-s", serial, "reverse", "tcp:\(Self.devicePort)", "tcp:\(port)"])
         }
     }
 
     /// Capturing stopped: the helpers lose the proxy, and drop their VPN at once rather than after their next check.
-    public func detachHelpers() async {
+    /// Only the one on `serial` when it is given.
+    public func detachHelpers(serial only: String? = nil) async {
         guard let sdk else { return }
-        for serial in await helperDevices() {
+        for serial in await helperDevices() where only == nil || only == serial {
             _ = try? await runner.run(sdk.adbPath, ["-s", serial] + Self.helperArguments("stop"))
             _ = try? await runner.run(sdk.adbPath, ["-s", serial, "reverse", "--remove", "tcp:\(Self.devicePort)"])
         }

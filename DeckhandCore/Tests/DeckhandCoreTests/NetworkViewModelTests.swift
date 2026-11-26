@@ -67,7 +67,8 @@ private let simulator = Device(id: "SIM", name: "iPhone", platform: .ios, osVers
     #expect(model.visible.count == 2 && model.visible[0].status == 200)
 
     model.filter = HTTPFilter(apps: ["Other"])
-    try? await Task.sleep(for: .milliseconds(60))
+    // the filter is applied after a short debounce; other tests keep the main actor busy meanwhile
+    for _ in 0..<100 where model.visible.map(\.id) != [2] { try? await Task.sleep(for: .milliseconds(20)) }
     #expect(model.visible.map(\.id) == [2])
     model.receive(flow(3, app: "Other"))
     model.receive(flow(4, app: "MyApp"))

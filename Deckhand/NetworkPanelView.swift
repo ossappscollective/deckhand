@@ -98,7 +98,8 @@ struct NetworkPanelView: View {
             Divider()
             Button("Custom…") { showCustomConditions = true }
             Divider()
-            Text(model.slowsEmulator ? "The emulator slows down all of its traffic." : "Applies to what goes through the proxy, while capturing.")
+            Text(model.slowsEmulator ? "The emulator slows down all of its traffic, capturing or not."
+                 : "Choosing a speed starts capturing this device by itself; No Limit stops it again.")
         } label: {
             Label(model.conditions.isLimited ? model.conditions.name : "Network", systemImage: "gauge.with.dots.needle.33percent")
                 .labelStyle(.titleAndIcon).font(.system(size: 11))
@@ -116,25 +117,29 @@ struct NetworkPanelView: View {
 
     private var captureToggle: some View {
         Button {
-            Task { if model.isRunning { await model.stop() } else { await model.start(routeMac: routesMac && device.platform == .ios && !device.isPhysical) } }
+            Task {
+                if model.isCapturing(device) { await model.stopCapture(device) }
+                else { await model.start(routeMac: routesMac && device.platform == .ios && !device.isPhysical, for: device) }
+            }
         } label: {
-            Label(model.isRunning ? "Stop" : "Capture", systemImage: model.isRunning ? "stop.circle.fill" : "record.circle")
+            Label(model.isCapturing(device) ? "Stop" : "Capture", systemImage: model.isCapturing(device) ? "stop.circle.fill" : "record.circle")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(model.isRunning ? Color.red : Color.primary)
+                .foregroundStyle(model.isCapturing(device) ? Color.red : Color.primary)
         }
         .controlSize(.small)
-        .help(model.isRunning ? "Stop capturing and put the Mac's proxy settings back" : "Start the proxy")
+        .help(model.isCapturing(device) ? "Stop capturing \(device.name). The Mac's proxy settings are put back with the last device."
+              : "Start capturing \(device.name)")
     }
 
     @ViewBuilder
     private var statusText: some View {
         switch model.state {
-        case .running(let port):
+        case .running(let port) where model.isCapturing(device):
             Text(model.filter.isActive || model.limitsToDevice ? "\(model.visible.count) of \(model.totalCount) · :\(String(port))" : "\(model.totalCount) requests · :\(String(port))")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
         case .failed(let message):
             Text(message).font(.system(size: 11)).foregroundStyle(.red).lineLimit(1)
-        case .stopped:
+        case .running, .stopped:
             Text("Press Capture to start").font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).layoutPriority(-1)
         }
     }
@@ -231,7 +236,7 @@ struct NetworkPanelView: View {
             .background(.blue.opacity(0.10))
             Divider()
         }
-        if model.isRunning, !model.deviceState.proxyConfigured {
+        if model.isCapturing(device), !model.deviceState.proxyConfigured {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 Text("\(device.name) is not sending its traffic here yet.")
@@ -241,7 +246,7 @@ struct NetworkPanelView: View {
             .padding(.horizontal, 10).padding(.vertical, 6)
             .background(.orange.opacity(0.12))
             Divider()
-        } else if model.isRunning, device.platform == .android, !dismissedTrust.contains(device.id),
+        } else if model.isCapturing(device), device.platform == .android, !dismissedTrust.contains(device.id),
                   let trust = model.deviceState.androidTrust, trust != .system {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
@@ -271,7 +276,7 @@ struct NetworkPanelView: View {
         if model.visible.isEmpty {
             VStack(spacing: 6) {
                 Spacer()
-                Text(model.isRunning ? "Waiting for requests from \(device.name)…" : "Capture is off")
+                Text(model.isCapturing(device) ? "Waiting for requests from \(device.name)…" : "Capture is off")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                 Spacer()
             }

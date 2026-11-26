@@ -586,6 +586,42 @@ private func trustSetup(_ runner: MockShellRunner) throws -> (DeviceProxySetup, 
     await model.stop()
 }
 
+@MainActor
+@Test func captureBelongsToEachDevice() async throws {
+    let model = NetworkViewModel(runner: MockShellRunner(), makeAuthority: { try makeAuthority() }, locateSDK: { nil })
+    let a = Device(id: "a", name: "A", platform: .ios, osVersion: "26", state: .running)
+    let b = Device(id: "b", name: "B", platform: .ios, osVersion: "26", state: .running)
+    await model.select(a)
+    await model.start(routeMac: false, for: a)
+    #expect(model.isCapturing(a))
+    // switching to another device does not make it a captured one
+    await model.select(b)
+    #expect(!model.isCapturing(b))
+    #expect(model.isCapturing(a))
+    await model.start(routeMac: false, for: b)
+    #expect(model.isCapturing(a) && model.isCapturing(b))
+    // the proxy goes on for the other one, and stops with the last
+    await model.stopCapture(a)
+    #expect(!model.isCapturing(a) && model.isCapturing(b) && model.isRunning)
+    await model.stopCapture(b)
+    #expect(!model.isRunning)
+}
+
+@MainActor
+@Test func aDeviceThatStopsLeavesTheOthersCapturing() async throws {
+    let model = NetworkViewModel(runner: MockShellRunner(), makeAuthority: { try makeAuthority() }, locateSDK: { nil })
+    let a = Device(id: "a", name: "A", platform: .ios, osVersion: "26", state: .running)
+    let b = Device(id: "b", name: "B", platform: .ios, osVersion: "26", state: .running)
+    await model.select(a)
+    await model.start(routeMac: false, for: a)
+    await model.start(routeMac: false, for: b)
+    await model.deviceListChanged([a, b])
+    await model.deviceListChanged([a.withState(.stopped), b])
+    #expect(!model.isCapturing(a) && model.isCapturing(b))
+    #expect(model.setupMessage?.contains("stopped") == true)
+    await model.stop()
+}
+
 // MARK: Network conditions
 
 private let bigHandler: UpstreamServer.Handler = { _, _ in
@@ -661,25 +697,55 @@ private func seconds(_ work: () async throws -> Void) async rethrows -> TimeInte
 @MainActor
 @Test func conditionsGoToTheProxyForSimulatorsAndToTheEmulatorForAndroid() async throws {
     let runner = MockShellRunner()
-    let model = NetworkViewModel(runner: runner, makeAuthority: { try makeAuthority() }, locateSDK: { AndroidSDK(root: "/sdk") })
+    let backup = NSTemporaryDirectory() + "deckhand-test-\(UUID().uuidString).json"
+    let model = NetworkViewModel(runner: runner, systemProxy: SystemProxy(runner: runner, backupPath: backup),
+                                 makeAuthority: { try makeAuthority() }, locateSDK: { AndroidSDK(root: "/sdk") })
     let sim = Device(id: "sim", name: "Sim", platform: .ios, osVersion: "26", state: .running)
     let avd = Device(id: "avd", name: "Pixel", platform: .android, osVersion: "API 36", state: .running, serial: "emulator-5554")
     let threeG = NetworkConditions.presets.first { $0.name == "3G" }!
 
     await model.select(sim)
+    #expect(!model.isCapturing(sim))
     await model.setConditions(threeG)
     #expect(model.conditions == threeG)
-    #expect(runner.commands.isEmpty)       // nothing on a device: the proxy applies it
+    #expect(model.isCapturing(sim))        // the proxy applies it, so capturing was started for it
+    #expect(model.setupMessage?.contains("Capturing started") == true)
+    #expect(!runner.commands.contains { $0.contains("emu network") })
 
     await model.select(avd)
     #expect(model.conditions == .online)   // the emulator has its own setting
     await model.setConditions(threeG)
     #expect(runner.commands.contains("/sdk/platform-tools/adb -s emulator-5554 emu network speed 330:780"))
+    #expect(!model.isCapturing(avd))       // and needs no capturing
     await model.select(sim)
     #expect(model.conditions == threeG)
+    // the capturing that only the slowdown started ends with it
+    await model.setConditions(.online)
+    #expect(model.conditions == .online)
+    #expect(!model.isCapturing(sim) && !model.isRunning)
     // the emulator forgets its network settings when it stops
     await model.select(avd)
     await model.deviceListChanged([avd.withState(.stopped)])
+    #expect(model.conditions == .online)
+}
+
+@MainActor
+@Test func capturingTheUserStartedStaysAfterTheSlowdownEnds() async throws {
+    let runner = MockShellRunner()
+    let backup = NSTemporaryDirectory() + "deckhand-test-\(UUID().uuidString).json"
+    let model = NetworkViewModel(runner: runner, systemProxy: SystemProxy(runner: runner, backupPath: backup),
+                                 makeAuthority: { try makeAuthority() }, locateSDK: { nil })
+    let sim = Device(id: "sim", name: "Sim", platform: .ios, osVersion: "26", state: .running)
+    let threeG = NetworkConditions.presets.first { $0.name == "3G" }!
+    await model.select(sim)
+    await model.start(routeMac: false, for: sim)
+    await model.setConditions(threeG)
+    #expect(model.conditions == threeG)
+    await model.setConditions(.online)
+    #expect(model.isCapturing(sim))
+    // stopping the capture takes the slowdown with it
+    await model.setConditions(threeG)
+    await model.stopCapture(sim)
     #expect(model.conditions == .online)
 }
 

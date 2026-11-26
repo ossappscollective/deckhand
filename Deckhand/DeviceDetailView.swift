@@ -441,11 +441,21 @@ private struct NetworkToolsView: View {
                 }
                 .controlSize(.small)
             }
-            Text(network.slowsEmulator(device)
-                 ? "The emulator slows down all of its traffic. Offline turns airplane mode on."
-                 : "Applied to what goes through the proxy, so capturing must be on. Offline fails every connection.")
+            Text(explanation)
                 .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if !network.slowsEmulator(device), let message = network.setupMessage {
+                Text(message).font(.system(size: 11)).foregroundStyle(.blue).fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+
+    private var explanation: String {
+        if network.slowsEmulator(device) {
+            return "The emulator slows down all of its traffic, with or without capturing. Offline turns airplane mode on."
+        }
+        let how = "It goes through Deckhand's proxy: choosing a speed starts capturing this device by itself, and No Limit stops it again "
+            + "(capturing you started yourself stays). Apps that ignore the system proxy are not slowed. Offline fails every connection."
+        return network.isCapturing(device) ? "Capturing is on for this device, which is what applies the slowdown. " + how : how
     }
 
     private func field(_ title: String, _ value: Binding<String>) -> some View {

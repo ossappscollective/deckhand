@@ -11,8 +11,8 @@ struct DeviceSetupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Set up \(device.name)").font(.headline)
-            step("Proxy is running", done: model.isRunning,
-                 detail: model.isRunning ? "Listening on 127.0.0.1:\(model.port)" : "Press Capture, or Set Up below")
+            step("Proxy is running", done: model.isCapturing(device),
+                 detail: model.isCapturing(device) ? "Listening on 127.0.0.1:\(model.port)" : "Press Capture, or Set Up below")
             step("Certificate is trusted", done: certificateDone, warning: certificateWarning, detail: certificateDetail)
             step(proxyTitle, done: model.deviceState.proxyConfigured, detail: proxyDetail)
             if let message = model.setupMessage {

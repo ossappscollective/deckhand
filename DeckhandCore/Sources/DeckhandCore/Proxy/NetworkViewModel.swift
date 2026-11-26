@@ -19,6 +19,9 @@ public final class NetworkViewModel {
     public private(set) var setupMessage: String?
     public private(set) var isWorking = false
     public private(set) var deviceState = DeviceProxyState()
+    /// The devices being captured. The proxy is one for all of them; it runs while any of them is in here, and what each
+    /// device sends is told apart by `matches`.
+    public private(set) var captured: [String: Device] = [:]
     /// The slower network of the selected device, if any. Emulators are slowed down themselves, everything else
     /// through the proxy while it is capturing.
     public private(set) var conditions = NetworkConditions.online
@@ -54,8 +57,10 @@ public final class NetworkViewModel {
     @ObservationIgnored private var server: ProxyServer?
     @ObservationIgnored private var authority: CertificateAuthority?
     @ObservationIgnored private var device: Device?
-    /// The device was running when the list last changed, so that stopping it can be told from never having started.
-    @ObservationIgnored private var deviceWasRunning = false
+    /// The devices that were running when the list last changed, so that stopping one can be told from never having started.
+    @ObservationIgnored private var seenRunning: Set<String> = []
+    /// Devices whose capturing was started by Deckhand to slow them down: it ends when they are set back to full speed.
+    @ObservationIgnored private var startedForSlowdown: Set<String> = []
     /// What the proxy applies: one setting for every device it inspects.
     private var proxyConditions = NetworkConditions.online
     /// What was set on each Android emulator itself.
@@ -96,6 +101,9 @@ public final class NetworkViewModel {
 
     public var isRunning: Bool { if case .running = state { true } else { false } }
 
+    /// Whether the proxy is taking in what `device` sends. Each device has its own, and keeps it while another is shown.
+    public func isCapturing(_ device: Device) -> Bool { isRunning && captured[device.id] != nil }
+
     public var selectedFlow: HTTPFlow? {
         selectedFlowId.flatMap { id in indexById[id].map { flows[$0] } }
     }
@@ -104,9 +112,29 @@ public final class NetworkViewModel {
 
     // MARK: Capture
 
-    /// Starts the proxy. `routeMac` also points the macOS proxy at it, which is what makes simulators use it.
-    public func start(routeMac: Bool) async {
-        guard !isRunning else { return }
+    /// Starts capturing `target` (the selected device when nil), starting the proxy too if no other device is using it.
+    /// `routeMac` also points the macOS proxy at it, which is what makes simulators use it.
+    public func start(routeMac: Bool, for target: Device? = nil) async {
+        let target = target ?? device
+        defer { refreshConditions() }
+        if let target {
+            captured[target.id] = target
+            if target.state == .running { seenRunning.insert(target.id) }
+        }
+        if isRunning {
+            // another device already runs the proxy: this one joins it
+            do {
+                if routeMac, !isRoutingMac {
+                    try await systemProxy.enable(port: port)
+                    isRoutingMac = true
+                }
+            } catch {
+                setupMessage = ErrorMessage.friendly(error)
+            }
+            await attachAndroidHelpers(for: target)
+            await refreshDeviceState()
+            return
+        }
         do {
             let authority = try makeAuthority()
             self.authority = authority
@@ -118,11 +146,12 @@ public final class NetworkViewModel {
                 try await systemProxy.enable(port: server.port)
                 isRoutingMac = true
             }
-            await attachAndroidHelpers()
+            await attachAndroidHelpers(for: target)
             await refreshDeviceState()
         } catch {
             server?.stop()
             server = nil
+            captured = [:]
             state = .failed(String(describing: error))
         }
     }
@@ -148,7 +177,13 @@ public final class NetworkViewModel {
     /// Where an iPhone or iPad on the same network points its proxy setting.
     public var networkAddress: String? { LocalNetwork.ipv4Addresses().first }
 
+    /// Stops capturing for every device, and the proxy with it.
     public func stop() async {
+        captured = [:]
+        startedForSlowdown = []
+        // the proxy is what slows simulators and phones down: without it there is nothing to apply, nor on its next start
+        proxyConditions = .online
+        defer { refreshConditions() }
         server?.stop()
         server = nil
         if isRoutingMac || systemProxy.hasPendingBackup {
@@ -165,19 +200,44 @@ public final class NetworkViewModel {
         if isRunning { state = .stopped }
     }
 
-    /// Called whenever the device list changes: capturing ends with the device that was being captured.
+    /// Stops capturing `device` only. The proxy goes on while another device uses it, and stops with the last one.
+    public func stopCapture(_ device: Device) async {
+        guard captured[device.id] != nil else { return }
+        captured[device.id] = nil
+        startedForSlowdown.remove(device.id)
+        guard !captured.isEmpty else { await stop(); return }
+        defer { refreshConditions() }
+        if let authority {
+            let setup = makeSetup(authority)
+            if device.platform == .android {
+                await setup.detachHelpers(serial: device.serial)
+                if let configured = configuredAndroid.removeValue(forKey: device.id) {
+                    try? await setup.disableAndroidProxy(on: configured, port: port)
+                }
+            }
+        }
+        // the Mac's proxy setting is only for simulators
+        let simulatorsLeft = captured.values.contains { $0.platform == .ios && !$0.isPhysical }
+        if device.platform == .ios, !device.isPhysical, !simulatorsLeft, isRoutingMac {
+            try? await systemProxy.restore()
+            isRoutingMac = false
+        }
+        await refreshDeviceState()
+    }
+
+    /// Called whenever the device list changes: a device's capturing ends with the device, and the proxy with the last one.
     public func deviceListChanged(_ devices: [Device]) async {
         // an emulator forgets its network settings when it stops
-        let stillRunning = Set(devices.filter { $0.state == .running }.map(\.id))
-        emulatorConditions = emulatorConditions.filter { stillRunning.contains($0.key) }
+        let running = Set(devices.filter { $0.state == .running }.map(\.id))
+        emulatorConditions = emulatorConditions.filter { running.contains($0.key) }
         conditions = device.map(conditions(for:)) ?? .online
-        guard let device else { deviceWasRunning = false; return }
-        let running = devices.first { $0.id == device.id }?.state == .running
-        let stopped = deviceWasRunning && !running
-        deviceWasRunning = running
-        guard isRunning, stopped else { return }
-        await stop()
-        setupMessage = "\(device.name) stopped, so capturing stopped too."
+        let stopped = captured.values.filter { seenRunning.contains($0.id) && !running.contains($0.id) }
+        seenRunning = running
+        guard isRunning, !stopped.isEmpty else { return }
+        for device in stopped { await stopCapture(device) }
+        if let selected = device, stopped.contains(where: { $0.id == selected.id }) {
+            setupMessage = "\(selected.name) stopped, so capturing stopped too."
+        }
     }
 
     /// Whether `device` is slowed down by its emulator rather than by the proxy.
@@ -185,7 +245,13 @@ public final class NetworkViewModel {
 
     /// What slows `device` down now, if anything.
     public func conditions(for device: Device) -> NetworkConditions {
-        slowsEmulator(device) ? emulatorConditions[device.id] ?? .online : proxyConditions
+        if slowsEmulator(device) { return emulatorConditions[device.id] ?? .online }
+        // the proxy slows down the devices it captures, and no others
+        return isCapturing(device) ? proxyConditions : .online
+    }
+
+    private func refreshConditions() {
+        conditions = device.map(conditions(for:)) ?? .online
     }
 
     /// Slows the network of `device` down, or lifts it with `.online`.
@@ -200,11 +266,36 @@ public final class NetworkViewModel {
                 return
             }
         } else {
+            // simulators and phones are slowed down by the proxy, so it must be capturing them: that is started here
+            if new.isLimited, !isCapturing(device) {
+                guard await startForSlowdown(device) else { return }
+            }
             proxyConditions = new
             server?.conditions = new
-            if new.isLimited, !isRunning { setupMessage = "The network is slowed down once capturing starts." }
+            // capturing that only the slowdown asked for ends with it
+            if !new.isLimited, startedForSlowdown.remove(device.id) != nil { await stopCapture(device) }
         }
-        if device.id == self.device?.id { conditions = new }
+        if device.id == self.device?.id { refreshConditions() }
+    }
+
+    /// Starts capturing `device` because it is to be slowed down, and says so. False when it could not be started.
+    private func startForSlowdown(_ device: Device) async -> Bool {
+        if device.platform == .ios, !device.isPhysical {
+            await start(routeMac: true, for: device)
+        } else {
+            // physical devices must be pointed at the proxy
+            await setUp(device)
+        }
+        guard isCapturing(device) else {
+            setupMessage = setupMessage ?? "Could not start capturing \(device.name), which slowing it down needs."
+            return false
+        }
+        startedForSlowdown.insert(device.id)
+        if setupMessage == nil {
+            setupMessage = "Capturing started for \(device.name): the slowdown goes through Deckhand's proxy. "
+                + "It stops when you set the network back to No Limit."
+        }
+        return true
     }
 
     /// The selected device, for the panel.
@@ -239,10 +330,15 @@ public final class NetworkViewModel {
         SystemProxy().restoreNow()
     }
 
-    /// Lets the helper apps on connected devices reach the proxy; they connect their VPN when they see it.
-    private func attachAndroidHelpers() async {
+    /// Lets the helper app on `device` (on every connected device when nil) reach the proxy; it connects its VPN when it sees it.
+    private func attachAndroidHelpers(for device: Device? = nil) async {
         guard let authority else { return }
-        await makeSetup(authority).attachHelpers(port: port)
+        if let device {
+            guard device.platform == .android else { return }
+            await makeSetup(authority).attachHelpers(port: port, serial: device.serial)
+        } else {
+            await makeSetup(authority).attachHelpers(port: port)
+        }
     }
 
     private func makeSetup(_ authority: CertificateAuthority) -> DeviceProxySetup {
@@ -290,10 +386,9 @@ public final class NetworkViewModel {
             filter = savedFilters[device.id] ?? HTTPFilter()
         }
         self.device = device
-        deviceWasRunning = device.state == .running
+        if device.state == .running { seenRunning.insert(device.id) }
         conditions = self.conditions(for: device)
         setupMessage = nil
-        if isRunning, device.platform == .android { await attachAndroidHelpers() }
         await refreshDeviceState()
         refilterNow()
     }
@@ -323,11 +418,12 @@ public final class NetworkViewModel {
         setupMessage = nil
         defer { isWorking = false }
         if device.platform == .ios, device.isPhysical {
-            await setUpPhone()
+            await setUpPhone(device)
             await refreshDeviceState()
             return
         }
-        if !isRunning { await start(routeMac: device.platform == .ios) }
+        // starts the proxy, or adds the device to the one that runs
+        await start(routeMac: device.platform == .ios, for: device)
         guard isRunning, let authority else { return }
         let setup = makeSetup(authority)
         // a certificate that has just been installed may now be trusted by the apps that rejected it
@@ -365,11 +461,16 @@ public final class NetworkViewModel {
     }
 
     /// Phones go over the network: listen there, and say what to do on the phone.
-    private func setUpPhone() async {
+    private func setUpPhone(_ phone: Device) async {
         if !isRunning || !allowsNetworkDevices {
+            // listening on the network means a new proxy: the others go on capturing through it
+            let others = captured.filter { $0.key != phone.id }
             await stop()
             allowsNetworkDevices = true
-            await start(routeMac: false)
+            await start(routeMac: false, for: phone)
+            for (id, device) in others where isRunning { captured[id] = device }
+        } else {
+            captured[phone.id] = phone
         }
         guard isRunning else { return }
         let address = networkAddress.map { "\($0) port \(port)" } ?? "this Mac's address, port \(port)"
@@ -400,8 +501,12 @@ public final class NetworkViewModel {
         if device.platform == .ios, device.isPhysical {
             allowsNetworkDevices = false
             if isRunning {
+                let others = captured.filter { $0.key != device.id }
                 await stop()
-                await start(routeMac: false)
+                if let first = others.values.first {
+                    await start(routeMac: others.values.contains { $0.platform == .ios && !$0.isPhysical }, for: first)
+                    for (id, other) in others where isRunning { captured[id] = other }
+                }
             }
             setupMessage = nil
             await refreshDeviceState()
@@ -420,6 +525,8 @@ public final class NetworkViewModel {
     // MARK: Flows
 
     func receive(_ flow: HTTPFlow) {
+        // a simulator that is not being captured may still use the Mac's proxy setting: what it sends is not wanted
+        if isRunning, let id = flow.client.deviceId, captured[id] == nil { return }
         pendingFlows.append(flow)
         guard !flushScheduled else { return }
         flushScheduled = true
