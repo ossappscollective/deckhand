@@ -1,6 +1,6 @@
 cask "deckhand" do
-  version "1.1.1"
-  sha256 "553e568c7af830105d0fbd47b73cb03c295964f473d0cb3a9089095f0b35eca0"
+  version "1.1.2"
+  sha256 "01bb28b98794d8802717bb17c08dbbc02222e5e7328669f4d2d2869ff2cdec27"
 
   url "https://github.com/ossappscollective/deckhand/releases/download/v#{version}/Deckhand-#{version}.zip"
   name "Deckhand"
